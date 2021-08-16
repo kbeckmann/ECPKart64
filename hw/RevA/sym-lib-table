@@ -8,5 +8,5 @@
   (lib (name MAX803)(type Legacy)(uri ${KIPRJMOD}/../symbols/MAX803.lib)(options "")(descr ""))
   (lib (name XC6206P25)(type Legacy)(uri ${KIPRJMOD}/../symbols/XC6206P25.lib)(options "")(descr ""))
   (lib (name SY8120B1ABC)(type Legacy)(uri ${KIPRJMOD}/../symbols/SY8120B1ABC.lib)(options "")(descr ""))
-  (lib (name RevA-rescue)(type Legacy)(uri ${KIPRJMOD}/RevA-rescue.lib)(options "")(descr ""))
+  (lib (name N64)(type Legacy)(uri ${KIPRJMOD}/../symbols/n64-cartridge.lib)(options "")(descr ""))
 )

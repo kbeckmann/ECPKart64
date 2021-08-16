@@ -1,1 +1,50 @@
+11089656573885
+ecp5board
+JP_3_0402_1005Metric
+Resistor SMD 0402 (1005 Metric), square (rectangular) end terminal, IPC_7351 nominal, (Body size source: http://www.tortai-tech.com/upload/download/2011102023233369053.pdf), generated with kicad-footprint-generator
+resistor
+0
+3
+3
+ecp5board
+L_1008_1210
+Inductor SMD 1008-1210 (2520-3225 Metric), square (rectangular) end terminal
+inductor
+0
+2
+2
+ecp5board
+N64-Connector
+
+
+0
+50
+50
+ecp5board
+PMOD_Socket_2x06_P2.54mm_Horizontal
+Through hole angled socket strip, 2x06, 2.54mm pitch, 8.51mm socket length, double cols (from Kicad 4.0.7), script generated
+Through hole angled socket strip THT 2x06 2.54mm double row
+0
+12
+12
+ecp5board
+SOA008-150-208mil
+Cypress SOA008 SOIC-8 150/208 mil
+SOA008 SOIC-8 1.27 150 208 mil
+0
+8
+8
+ecp5board
+logo
+
+
+0
+0
+0
+ecp5board
+xil_logo_new
+
+
+0
+0
 0
