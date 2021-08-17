@@ -727,22 +727,22 @@ Wire Wire Line
 	2250 8200 2100 8200
 Connection ~ 2250 8200
 Connection ~ 2250 8400
-Text Label 3350 8400 0    50   ~ 0
+Text Label 3000 8400 0    50   ~ 0
 USB_DP
-Text Label 3350 8200 0    50   ~ 0
+Text Label 3000 8200 0    50   ~ 0
 USB_DM
 $Comp
 L Device:Ferrite_Bead FB1
 U 1 1 5DD4A9CC
-P 2600 7700
-F 0 "FB1" V 2450 7500 50  0000 L CNN
-F 1 "Ferrite_Bead" V 2500 7150 50  0000 L CNN
-F 2 "Inductor_SMD:L_0805_2012Metric" V 2530 7700 50  0001 C CNN
-F 3 " " H 2600 7700 50  0001 C CNN
-F 4 "C88993" H 2600 7700 50  0001 C CNN "LCSC"
-F 5 "https://lcsc.com/product-detail/Ferrite-Beads-And-Chips_muRata_BLM21PG220SN1D_22R-25_C88993.html" H 2600 7700 50  0001 C CNN "LCSC URL"
-F 6 "0.0183" H 2600 7700 50  0001 C CNN "LCSC EUR"
-	1    2600 7700
+P 1500 7150
+F 0 "FB1" V 1450 7250 50  0000 L CNN
+F 1 "Ferrite_Bead" V 1400 6600 50  0000 L CNN
+F 2 "Inductor_SMD:L_0805_2012Metric" V 1430 7150 50  0001 C CNN
+F 3 " " H 1500 7150 50  0001 C CNN
+F 4 "C88993" H 1500 7150 50  0001 C CNN "LCSC"
+F 5 "https://lcsc.com/product-detail/Ferrite-Beads-And-Chips_muRata_BLM21PG220SN1D_22R-25_C88993.html" H 1500 7150 50  0001 C CNN "LCSC URL"
+F 6 "0.0183" H 1500 7150 50  0001 C CNN "LCSC EUR"
+	1    1500 7150
 	0    1    1    0   
 $EndComp
 $Comp
@@ -815,12 +815,12 @@ Wire Wire Line
 $Comp
 L power:VBUS #PWR01
 U 1 1 5DC5476C
-P 3000 7600
-F 0 "#PWR01" H 3000 7450 50  0001 C CNN
-F 1 "VBUS" H 3015 7773 50  0000 C CNN
-F 2 "" H 3000 7600 50  0001 C CNN
-F 3 "" H 3000 7600 50  0001 C CNN
-	1    3000 7600
+P 2450 7600
+F 0 "#PWR01" H 2450 7450 50  0001 C CNN
+F 1 "VBUS" H 2465 7773 50  0000 C CNN
+F 2 "" H 2450 7600 50  0001 C CNN
+F 3 "" H 2450 7600 50  0001 C CNN
+	1    2450 7600
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
@@ -1106,9 +1106,6 @@ Wire Wire Line
 	4500 3400 4500 3650
 Wire Wire Line
 	1400 6250 1400 6400
-Connection ~ 2300 4450
-Wire Wire Line
-	2300 4450 2300 4500
 $Comp
 L Device:C_Small C6
 U 1 1 5EED2BA4
@@ -1183,7 +1180,7 @@ Connection ~ 13800 4250
 Wire Wire Line
 	13800 4250 13800 4300
 Wire Wire Line
-	700  7100 700  5350
+	700  7150 700  5350
 Connection ~ 700  5350
 Text Label 16800 4600 2    50   ~ 0
 CLK_16MHZ
@@ -1232,8 +1229,6 @@ Wire Wire Line
 Wire Wire Line
 	1050 2500 1400 2500
 Connection ~ 1400 2500
-Wire Wire Line
-	1050 4250 1050 4450
 $Comp
 L Device:C_Small C1
 U 1 1 5E03E052
@@ -1255,8 +1250,6 @@ Wire Wire Line
 Wire Wire Line
 	1000 6400 1400 6400
 Connection ~ 1400 6400
-Wire Wire Line
-	1050 3400 1050 4050
 Text Label 16850 11750 2    50   ~ 0
 FPGA_SPI_D0
 Text Label 16850 11650 2    50   ~ 0
@@ -1656,26 +1649,11 @@ F 6 "0.0529" H 2300 3300 50  0001 C CNN "LCSC EUR"
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	2300 3700 2300 4450
-Wire Wire Line
 	2300 4500 4500 4500
 Wire Wire Line
 	2700 3400 4500 3400
 Wire Wire Line
-	1050 4450 2300 4450
-Wire Wire Line
 	1050 3400 1900 3400
-$Comp
-L Device:C_Small C4
-U 1 1 5DFFA7BA
-P 1050 4150
-F 0 "C4" H 958 4104 50  0000 R CNN
-F 1 "4u7" H 958 4195 50  0000 R CNN
-F 2 "Capacitor_SMD:C_0402_1005Metric" H 1050 4150 50  0001 C CNN
-F 3 " " H 1050 4150 50  0001 C CNN
-	1    1050 4150
-	-1   0    0    1   
-$EndComp
 Text Notes 4900 3450 0    50   ~ 0
 2V5: 200mA max
 Text Notes 4850 1450 0    50   ~ 0
@@ -3555,7 +3533,7 @@ TODO
 Text Notes 650  12400 0    50   ~ 0
 RevA 0.1:\n
 $Sheet
-S 4000 8650 900  550 
+S 2350 10400 900  550 
 U 61266D88
 F0 "Overview" 50
 F1 "overview.sch" 50
@@ -3585,22 +3563,21 @@ F 3 "" H 1050 3300 50  0001 C CNN
 	1    1050 3300
 	1    0    0    -1  
 $EndComp
-Connection ~ 1050 3400
 Text Label 700  1300 0    50   ~ 0
 V_SUPPLY
 $Comp
 L Jumper:Jumper_3_Open JP1
 U 1 1 6220D837
-P 3300 7100
-F 0 "JP1" H 3300 7324 50  0000 C CNN
-F 1 "4K7" H 3300 7233 50  0000 C CNN
-F 2 "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Horizontal" H 3300 7100 50  0001 C CNN
-F 3 " " H 3300 7100 50  0001 C CNN
-F 4 "C105871" H 3300 7100 50  0001 C CNN "LCSC"
-F 5 "0.0005" H 3300 7100 50  0001 C CNN "LCSC EUR"
-F 6 "https://lcsc.com/product-detail/Chip-Resistor-Surface-Mount_4-7KR-4701-1_C105871.html" H 3300 7100 50  0001 C CNN "LCSC URL"
-	1    3300 7100
-	0    1    1    0   
+P 2800 7150
+F 0 "JP1" H 2800 7374 50  0000 C CNN
+F 1 "4K7" H 2800 7283 50  0000 C CNN
+F 2 "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Horizontal" H 2800 7150 50  0001 C CNN
+F 3 " " H 2800 7150 50  0001 C CNN
+F 4 "C105871" H 2800 7150 50  0001 C CNN "LCSC"
+F 5 "0.0005" H 2800 7150 50  0001 C CNN "LCSC EUR"
+F 6 "https://lcsc.com/product-detail/Chip-Resistor-Surface-Mount_4-7KR-4701-1_C105871.html" H 2800 7150 50  0001 C CNN "LCSC URL"
+	1    2800 7150
+	0    1    -1   0   
 $EndComp
 $Comp
 L Connector:Micro_SD_Card J2
@@ -4060,8 +4037,6 @@ Wire Wire Line
 Wire Wire Line
 	8050 13750 8450 13750
 Wire Wire Line
-	8050 13850 8450 13850
-Wire Wire Line
 	8050 13950 8450 13950
 Wire Wire Line
 	8050 14050 8450 14050
@@ -4114,8 +4089,6 @@ Wire Wire Line
 	5600 13550 6000 13550
 Wire Wire Line
 	5600 13650 6000 13650
-Wire Wire Line
-	5600 13750 6000 13750
 Wire Wire Line
 	5600 13850 6000 13850
 Wire Wire Line
@@ -4281,7 +4254,6 @@ N64_ALEL
 Text Label 8450 13450 0    50   ~ 0
 N64_ALEH
 NoConn ~ 8450 13750
-NoConn ~ 8450 13850
 Text Label 8450 14150 0    50   ~ 0
 N64_VCC
 Text Label 8450 14250 0    50   ~ 0
@@ -4301,7 +4273,6 @@ N64_CIC_DIO
 Text Label 5600 14150 2    50   ~ 0
 N64_VCC
 NoConn ~ 5600 13850
-NoConn ~ 5600 13750
 Text Label 5600 13450 2    50   ~ 0
 N64_READ
 Text Label 5600 13250 2    50   ~ 0
@@ -4320,20 +4291,6 @@ F 2 "ecp5board:N64-Connector" H 7000 12700 60  0000 C CNN
 F 3 "" H 7000 12700 60  0000 C CNN
 	1    7050 13750
 	1    0    0    -1  
-$EndComp
-$Comp
-L Device:R_Pack04 RN12
-U 1 1 666C0572
-P 10350 15750
-F 0 "RN12" V 10050 15750 50  0000 C CNN
-F 1 "22R_x4" V 10050 15800 50  0001 C CNN
-F 2 "Resistor_SMD:R_Array_Convex_4x0603" V 10625 15750 50  0001 C CNN
-F 3 " " H 10350 15750 50  0001 C CNN
-F 4 "C309446" V 10350 15750 50  0001 C CNN "LCSC"
-F 5 "0.0075" H 10350 15750 50  0001 C CNN "LCSC EUR"
-F 6 "https://lcsc.com/product-detail/Others_YAGEO-AF124-JR-0722RL_C309446.html" H 10350 15750 50  0001 C CNN "LCSC URL"
-	1    10350 15750
-	0    1    1    0   
 $EndComp
 $Comp
 L Device:R_Pack04 RN10
@@ -4477,7 +4434,7 @@ Text Label 10050 15200 2    50   ~ 0
 N64_CIC_DCLK
 Text Label 10050 15300 2    50   ~ 0
 N64_NMI
-Text Label 10050 15550 2    50   ~ 0
+Text Label 10050 13500 2    50   ~ 0
 N64_RAUDIO
 Wire Wire Line
 	10050 11400 10150 11400
@@ -4535,10 +4492,6 @@ Wire Wire Line
 	10050 15200 10150 15200
 Wire Wire Line
 	10050 15300 10150 15300
-Wire Wire Line
-	10050 15550 10150 15550
-Wire Wire Line
-	10050 15650 10150 15650
 $Comp
 L Device:R_Pack04 RN11
 U 1 1 666C0569
@@ -4554,66 +4507,51 @@ F 6 "https://lcsc.com/product-detail/Others_YAGEO-AF124-JR-0722RL_C309446.html" 
 	0    1    1    0   
 $EndComp
 NoConn ~ 16950 12050
-Text Notes 3800 8200 0    50   ~ 0
-TODO: Add pull ups
 $Comp
 L Device:R R17
 U 1 1 6A9F5C9D
-P 2850 8400
-F 0 "R17" V 2900 8250 50  0000 C CNN
-F 1 "22R" V 2850 8400 39  0000 C CNN
-F 2 "Resistor_SMD:R_0402_1005Metric" V 2780 8400 50  0001 C CNN
-F 3 " " H 2850 8400 50  0001 C CNN
-	1    2850 8400
+P 2550 8400
+F 0 "R17" V 2600 8150 50  0000 L CNN
+F 1 "22R" V 2550 8400 39  0000 C CNN
+F 2 "Resistor_SMD:R_0402_1005Metric" V 2480 8400 50  0001 C CNN
+F 3 " " H 2550 8400 50  0001 C CNN
+	1    2550 8400
 	0    -1   -1   0   
 $EndComp
 Wire Wire Line
-	2250 8400 2700 8400
-Wire Wire Line
-	3000 8400 3350 8400
+	2250 8400 2400 8400
 $Comp
 L Device:R R8
 U 1 1 6AB1C912
-P 2850 8200
-F 0 "R8" V 2900 8050 50  0000 C CNN
-F 1 "22R" V 2850 8200 39  0000 C CNN
-F 2 "Resistor_SMD:R_0402_1005Metric" V 2780 8200 50  0001 C CNN
-F 3 " " H 2850 8200 50  0001 C CNN
-	1    2850 8200
+P 2550 8200
+F 0 "R8" V 2600 8000 50  0000 L CNN
+F 1 "22R" V 2550 8200 39  0000 C CNN
+F 2 "Resistor_SMD:R_0402_1005Metric" V 2480 8200 50  0001 C CNN
+F 3 " " H 2550 8200 50  0001 C CNN
+	1    2550 8200
 	0    -1   -1   0   
 $EndComp
 Wire Wire Line
-	2250 8200 2700 8200
+	2250 8200 2400 8200
 Wire Wire Line
-	3000 8200 3350 8200
+	2700 8200 3000 8200
 Wire Wire Line
-	2100 7700 2450 7700
+	2800 6800 2800 6900
 Wire Wire Line
-	3300 6800 3300 6850
-Text Label 2450 7100 0    50   ~ 0
-V_SUPPLY
-Wire Wire Line
-	2750 7700 3000 7700
-Wire Wire Line
-	3300 7350 3300 7700
+	2800 7400 2800 7700
 $Comp
 L power:+12V #PWR0145
 U 1 1 6B7E33AE
-P 3300 6800
-F 0 "#PWR0145" H 3300 6650 50  0001 C CNN
-F 1 "+12V" H 3315 6973 50  0000 C CNN
-F 2 "" H 3300 6800 50  0001 C CNN
-F 3 "" H 3300 6800 50  0001 C CNN
-	1    3300 6800
+P 2800 6800
+F 0 "#PWR0145" H 2800 6650 50  0001 C CNN
+F 1 "+12V" H 2815 6973 50  0000 C CNN
+F 2 "" H 2800 6800 50  0001 C CNN
+F 3 "" H 2800 6800 50  0001 C CNN
+	1    2800 6800
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	700  7100 3150 7100
-Wire Wire Line
-	3000 7600 3000 7700
-Connection ~ 3000 7700
-Wire Wire Line
-	3000 7700 3300 7700
+	2450 7600 2450 7700
 $Comp
 L power:+3V3 #PWR0101
 U 1 1 61EDAE19
@@ -4688,4 +4626,77 @@ Text Label 14700 1050 0    50   ~ 0
 DEBUG_1
 Text Label 14700 1150 0    50   ~ 0
 DEBUG_2
+Wire Wire Line
+	1350 7150 700  7150
+Wire Wire Line
+	2100 7700 2450 7700
+Wire Wire Line
+	2650 7150 1650 7150
+Wire Wire Line
+	2450 7700 2800 7700
+Connection ~ 2450 7700
+$Comp
+L Device:R R38
+U 1 1 61A3809E
+P 3550 8400
+F 0 "R38" V 3600 8150 50  0000 L CNN
+F 1 "1K1" V 3550 8400 39  0000 C CNN
+F 2 "Resistor_SMD:R_0402_1005Metric" V 3480 8400 50  0001 C CNN
+F 3 " " H 3550 8400 50  0001 C CNN
+	1    3550 8400
+	0    -1   -1   0   
+$EndComp
+$Comp
+L Diode:1N914 D1
+U 1 1 6237C280
+P 4000 8400
+F 0 "D1" H 4000 8617 50  0000 C CNN
+F 1 "1N914" H 4000 8526 50  0000 C CNN
+F 2 "Diode_SMD:D_SOD-323_HandSoldering" H 4000 8225 50  0001 C CNN
+F 3 "http://www.vishay.com/docs/85622/1n914.pdf" H 4000 8400 50  0001 C CNN
+	1    4000 8400
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	3700 8400 3850 8400
+Text Label 4350 8400 0    50   ~ 0
+USB_PULL_DP
+Wire Wire Line
+	4350 8400 4150 8400
+Wire Wire Line
+	2700 8400 3400 8400
+Text Notes 3450 8150 0    50   ~ 0
+Drive USB_PULL_DP high to enable\nUSB 1.1 FullSpeed device mode
+$Comp
+L power:+12V #PWR0147
+U 1 1 62B7FE52
+P 9000 13750
+F 0 "#PWR0147" H 9000 13600 50  0001 C CNN
+F 1 "+12V" H 9015 13923 50  0000 C CNN
+F 2 "" H 9000 13750 50  0001 C CNN
+F 3 "" H 9000 13750 50  0001 C CNN
+	1    9000 13750
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	9000 13750 9000 13850
+Wire Wire Line
+	8050 13850 9000 13850
+$Comp
+L power:+12V #PWR0148
+U 1 1 62C157A8
+P 5000 13650
+F 0 "#PWR0148" H 5000 13500 50  0001 C CNN
+F 1 "+12V" H 5015 13823 50  0000 C CNN
+F 2 "" H 5000 13650 50  0001 C CNN
+F 3 "" H 5000 13650 50  0001 C CNN
+	1    5000 13650
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	5000 13750 5000 13650
+Wire Wire Line
+	5000 13750 6000 13750
+Wire Wire Line
+	2300 3700 2300 4500
 $EndSCHEMATC
