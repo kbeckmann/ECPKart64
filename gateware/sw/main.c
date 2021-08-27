@@ -10,6 +10,8 @@
 #include <console.h>
 #include <generated/csr.h>
 
+#include "cic.h"
+
 /*-----------------------------------------------------------------------*/
 /* Uart                                                                  */
 /*-----------------------------------------------------------------------*/
@@ -86,7 +88,7 @@ static void help(void)
 #ifdef CSR_LEDS_BASE
 	puts("led                - Led demo");
 #endif
-	puts("helloc             - Hello C");
+	puts("cic                - Start CIC emulation");
 }
 
 /*-----------------------------------------------------------------------*/
@@ -130,14 +132,6 @@ static void led_cmd(void)
 }
 #endif
 
-extern void helloc(void);
-
-static void helloc_cmd(void)
-{
-	printf("Hello C demo...\n");
-	helloc();
-}
-
 /*-----------------------------------------------------------------------*/
 /* Console service / Main                                                */
 /*-----------------------------------------------------------------------*/
@@ -158,8 +152,8 @@ static void console_service(void)
 	else if(strcmp(token, "led") == 0)
 		led_cmd();
 #endif
-	else if(strcmp(token, "helloc") == 0)
-		helloc_cmd();
+	else if(strcmp(token, "cic") == 0)
+		main_cic();
 	prompt();
 }
 

@@ -22,7 +22,7 @@ endif
 C_SOURCES =  \
 	isr.c \
 	main.c \
-	helloc.c \
+	cic.c \
 
 OBJECTS = $(addprefix $(APP_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
 
