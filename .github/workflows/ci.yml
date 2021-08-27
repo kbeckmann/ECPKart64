@@ -32,7 +32,10 @@ jobs:
 
       # Build bitstream
       - name: Build bitstream and app
-        run: make bitstream
+        run: |
+          ls $PWD/../riscv64-*/bin/
+          riscv64-unknown-elf-gcc --version
+          make bitstream
 
       # Build FPGA app
       - name: Build app
