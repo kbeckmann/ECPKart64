@@ -4,8 +4,15 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
+
+      # Install nightly yosys, nextpnr
+      - uses: actions/checkout@v2
+      - uses: YosysHQ/setup-oss-cad-suite@v1
+      - run: yosys --version
+      - run: nextpnr-ecp5 --version
+
       # Checkout Repository
       - name: Checkout
         uses: actions/checkout@v2
