@@ -31,12 +31,15 @@ jobs:
           riscv64-unknown-elf-gcc --version
 
       # Build bitstream
-      - name: Build bitstream and app
+      - name: Build bitstream and bios
         run: |
+          export PATH=$PATH:$(echo $PWD/../riscv64-*/bin/)
           ls $PWD/../riscv64-*/bin/
           riscv64-unknown-elf-gcc --version
           make bitstream
 
       # Build FPGA app
       - name: Build app
-        run: make app
+        run: |
+          export PATH=$PATH:$(echo $PWD/../riscv64-*/bin/)
+          make app
