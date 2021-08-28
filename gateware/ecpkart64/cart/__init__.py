@@ -1,11 +1,12 @@
 # Copyright (c) 2021 Konrad Beckmann <konrad.beckmann@gmail.com>
 # SPDX-License-Identifier: BSD-2-Clause
 
+from litex.tools.litex_client import read_memory
 from migen import *
 from litex.soc.interconnect.csr import *
 from migen.genlib.cdc import MultiReg
 
-from struct import unpack
+from struct import pack, unpack
 
 # N64 Cart integration ---------------------------------------------------------------------------------------
 
@@ -46,9 +47,11 @@ class N64Cart(Module, AutoCSR):
 
         with open("bootrom.z64", "rb") as f:
             # Read the first 74kB (37k words) from the bootrom (controller example)
-            # rom_words = 37 * 1024
-            rom_words = 1024
+            rom_words = 37 * 1024
+            # rom_words = 1 * 1024
+            # rom_words = 1024
             rom_data = unpack(f">{rom_words}H", f.read()[:rom_words * 2])
+            # rom_data = pack(f">{rom_words}H", *[(i+3) for i in range(rom_words)])
 
         rom = Memory(width=16, depth=rom_words, init=rom_data)
         rom_port = rom.get_port()
@@ -62,14 +65,21 @@ class N64Cart(Module, AutoCSR):
         roms_cs = Signal()
 
         # 0x10000000	0x1FBFFFFF	Cartridge Domain 1 Address 2	Cartridge ROM
-        self.comb += If(n64_addr[27:] == 0b00001, # 0x10000000
-                        rom_port.adr.eq(n64_addr[1:]),
+        # self.comb += If(n64_addr[27:] == 0b00001, # 0x10000000
+        #                 rom_port.adr.eq(n64_addr[1:]),
+        #                 roms_cs.eq(1),
+        #              )
+
+        self.comb += If((n64_addr >= 0x1000_0000) & (n64_addr < 0x1FC0_0000),
+                        rom_port.adr.eq(n64_addr[1:24]),
                         roms_cs.eq(1),
                      )
 
         led_state = Signal(4)
         # self.comb += leds.eq(Cat(led_state, n64_read, n64_write, n64_aleh, n64_alel))
         self.comb += leds.eq(Cat(led_state, n64_read, n64_nmi, n64_aleh, n64_alel))
+
+        self.read_active = n64_read_active = Signal()
 
         self.fsm = fsm = FSM(reset_state="INIT")
         self.submodules += fsm
@@ -83,6 +93,7 @@ class N64Cart(Module, AutoCSR):
 
             # Reset values
             NextValue(n64_addr, 0),
+            NextValue(n64_read_active, 0),
 
             # Active low. If high, start.
             If(n64_cold_reset, NextState("START"))
@@ -140,16 +151,27 @@ class N64Cart(Module, AutoCSR):
             NextValue(led_state, led_state | 0b1000),
             # While in this state, we are processing the read request.
 
+            If(n64_read_active,
+                n64_ad_out.eq(rom_port.dat_r),
+                n64_ad_oe.eq(1),
+            ),
+
+
             # Only accept read request if we should handle it
             #If(~n64_read & roms_cs,
             If(~n64_read,
-                If(n64_addr[1],
-                    n64_ad_out.eq(0x8037),
-                    n64_ad_oe.eq(1),
-                ).Else(
-                    n64_ad_out.eq(0xFF40),
-                    n64_ad_oe.eq(1),
-                ),
+                NextValue(n64_read_active, 1),
+
+                n64_ad_out.eq(rom_port.dat_r),
+                n64_ad_oe.eq(1),
+
+                # If(n64_addr[1],
+                #     n64_ad_out.eq(0x8037),
+                #     n64_ad_oe.eq(1),
+                # ).Else(
+                #     n64_ad_out.eq(0xFF40),
+                #     n64_ad_oe.eq(1),
+                # ),
 
                 NextState("WAIT_READ_H"),
             ).Elif(n64_aleh,
@@ -162,18 +184,12 @@ class N64Cart(Module, AutoCSR):
         )
 
         fsm.act("WAIT_READ_H",
-            state.eq(4),
+            state.eq(5),
             NextValue(led_state, led_state | 0b1000),
             # The data was latched in the previous state. OE = 1 now
 
-            If(n64_addr[1],
-                n64_ad_out.eq(0x8037),
-                n64_ad_oe.eq(1),
-            ).Else(
-                n64_ad_out.eq(0xFF40),
-                n64_ad_oe.eq(1),
-            ),
-
+            n64_ad_out.eq(rom_port.dat_r),
+            n64_ad_oe.eq(1),
 
             If(n64_read,
                 # Increase address
@@ -181,6 +197,7 @@ class N64Cart(Module, AutoCSR):
                 NextState("WAIT_READ_WRITE"),
             ).Elif(n64_alel | n64_aleh,
                 # Request done, return.
+                NextValue(n64_read_active, 0),
                 NextState("START"),
             ),
 

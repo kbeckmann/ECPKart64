@@ -151,12 +151,13 @@ class BaseSoC(SoCCore):
             n64cart.ad_in,
 
             n64cart.n64_addr,
+            n64cart.read_active,
 
             n64cart.state,
         ]
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
-            depth        = 1024 * 8,
-            clock_domain = "sys2x",
+            depth        = 1024 * 2,
+            clock_domain = "sys",
             csr_csv      = "analyzer.csv")
         self.add_csr("analyzer")
 
