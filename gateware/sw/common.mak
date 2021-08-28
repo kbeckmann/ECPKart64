@@ -37,7 +37,7 @@ COMMONFLAGS = $(DEPFLAGS) -Os $(CPUFLAGS) -g3 \
 			-Wall -Wno-missing-prototypes \
 			$(INCLUDES)
 
-CFLAGS = $(COMMONFLAGS) -fexceptions -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes
+CFLAGS = $(COMMONFLAGS) -fexceptions -mstrict-align -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes
 
 CXXFLAGS = $(COMMONFLAGS) -std=c++11 -I$(SOC_DIRECTORY)/software/include/basec++ -fexceptions -fno-rtti -ffreestanding
 

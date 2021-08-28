@@ -55,7 +55,7 @@ $(APP_DIR)/%.o: %.c Makefile | $(APP_DIR)
 	$(V)$(ECHO) [ CC ] $(notdir $@)
 	$(V)$(compile)
 
-%.o: %.S
+$(APP_DIR)/%.o: %.S Makefile | $(APP_DIR)
 	$(V)$(ECHO) [ CC ] $(notdir $@)
 	$(V)$(assemble)
 

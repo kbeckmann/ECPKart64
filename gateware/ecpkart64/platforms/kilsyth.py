@@ -24,6 +24,11 @@ _io = [
         Subsignal("rx", Pins("D12"), IOStandard("LVCMOS33"))  # PMOD0_2
     ),
 
+    ("serial", 1,
+        Subsignal("tx", Pins("A13"), IOStandard("LVCMOS33")), # PMOD0_3
+        Subsignal("rx", Pins("D13"), IOStandard("LVCMOS33"))  # PMOD0_4
+    ),
+
     ("sdram_clock", 0, Pins("F19"), IOStandard("LVCMOS33")),
     ("sdram", 0,
         Subsignal("a",          Pins("M20 M19 L20 L19 K20 K19 K18 J20 J19 H20 N19 G20 G19")),

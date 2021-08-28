@@ -3577,7 +3577,7 @@ F 4 "C105871" H 2800 7150 50  0001 C CNN "LCSC"
 F 5 "0.0005" H 2800 7150 50  0001 C CNN "LCSC EUR"
 F 6 "https://lcsc.com/product-detail/Chip-Resistor-Surface-Mount_4-7KR-4701-1_C105871.html" H 2800 7150 50  0001 C CNN "LCSC URL"
 	1    2800 7150
-	0    1    -1   0   
+	0    1    1    0   
 $EndComp
 $Comp
 L Connector:Micro_SD_Card J2
@@ -4258,7 +4258,6 @@ Text Label 8450 14150 0    50   ~ 0
 N64_VCC
 Text Label 8450 14250 0    50   ~ 0
 N64_CIC_DCLK
-NoConn ~ 8450 14350
 Text Label 8450 14450 0    50   ~ 0
 N64_NMI
 NoConn ~ 8450 14550
@@ -4287,7 +4286,7 @@ U 1 1 63378C0C
 P 7050 13750
 F 0 "CON1" H 7050 15250 60  0000 C CNN
 F 1 "N64-Cartridge" H 7050 15150 60  0000 C CNN
-F 2 "ecp5board:N64-Connector" H 7000 12700 60  0000 C CNN
+F 2 "ecp5board:N64-Connector" H 7050 12400 60  0000 C CNN
 F 3 "" H 7000 12700 60  0000 C CNN
 	1    7050 13750
 	1    0    0    -1  
@@ -4699,4 +4698,6 @@ Wire Wire Line
 	5000 13750 6000 13750
 Wire Wire Line
 	2300 3700 2300 4500
+Text Label 8450 14350 0    50   ~ 0
+N64_INT1
 $EndSCHEMATC

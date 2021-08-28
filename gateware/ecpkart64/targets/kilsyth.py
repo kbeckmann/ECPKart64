@@ -23,6 +23,8 @@ from litex.soc.cores.gpio import GPIOTristate, GPIOIn
 
 from litedram.phy import GENSDRPHY, HalfRateGENSDRPHY
 
+from litescope import LiteScopeAnalyzer
+
 # Kind of a hack?
 from litedram.modules import SDRAMModule, _TechnologyTimings, _SpeedgradeTimings
 
@@ -107,14 +109,19 @@ class BaseSoC(SoCCore):
             )
 
         # Leds -------------------------------------------------------------------------------------
-        if with_led_chaser:
-            self.submodules.leds = LedChaser(
-                pads         = platform.request_all("user_led"),
-                sys_clk_freq = sys_clk_freq)
 
-        self.submodules.n64 = N64Cart(
-                pads         = platform.request("n64"),
-                sys_clk_freq = sys_clk_freq,
+        leds = platform.request_all("user_led")
+
+        # if with_led_chaser:
+        #     self.submodules.leds = LedChaser(
+        #         pads         = leds[-2],
+        #         sys_clk_freq = sys_clk_freq)
+
+        n64_pads = platform.request("n64")
+
+        self.submodules.n64 = n64cart = N64Cart(
+                pads         = n64_pads,
+                leds         = leds
         )
 
         n64cic = self.platform.request("n64cic")
@@ -122,6 +129,35 @@ class BaseSoC(SoCCore):
         self.submodules.n64cic_cic_dclk = GPIOIn(n64cic.cic_dclk)
         self.submodules.n64cic_cic_dio  = GPIOTristate(n64cic.cic_dio)
         self.submodules.n64cic_eep_sdat = GPIOTristate(n64cic.eep_sdat)
+        self.submodules.n64_cold_reset  = GPIOIn(n64_pads.cold_reset)
+
+
+        analyzer_signals = [
+            # n64cic.cic_dio,
+            # n64cic.cic_dclk,
+            # n64_pads.aleh,
+            # n64_pads.alel,
+            # n64_pads.read,
+            # n64_pads.write,
+            n64cart.cold_reset,
+            n64cart.aleh,
+            n64cart.alel,
+            n64cart.read,
+            n64cart.write,
+            n64cart.nmi,
+            n64cart.ad_oe,
+            n64cart.ad_out,
+            n64cart.ad_in,
+            n64cart.state,
+        ]
+        self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
+            depth        = 1024 * 24,
+            clock_domain = "sys2x",
+            csr_csv      = "analyzer.csv")
+        self.add_csr("analyzer")
+
+        self.add_uartbone(name="serial", baudrate=1000000)
+
 
 
 
@@ -137,7 +173,7 @@ def main():
     parser.add_argument("--device",          default="LFE5U-45F",   help="FPGA device: LFE5U-12F, LFE5U-25F, LFE5U-45F (default)  or LFE5U-85F")
     parser.add_argument("--revision",        default="1.0",         help="Board revision: 1.0 (default)")
     parser.add_argument("--sys-clk-freq",    default=50e6,          help="System clock frequency  (default: 50MHz)")
-    parser.add_argument("--sdram-rate",      default="1:1",         help="SDRAM Rate: 1:1 Full Rate (default), 1:2 Half Rate")
+    parser.add_argument("--sdram-rate",      default="1:2",         help="SDRAM Rate: 1:1 Full Rate (default), 1:2 Half Rate")
     builder_args(parser)
     soc_core_args(parser)
     trellis_args(parser)
@@ -157,7 +193,7 @@ def main():
 
     if args.load:
         cmd = "openocd -f openocd/SiPEED.cfg -f openocd/kilsyth_lfe5u45.cfg " + \
-              f"-c \"transport select jtag; adapter_khz 1000; init; svf -tap lfe5u45.tap -quiet -progress {os.path.join(builder.gateware_dir, soc.build_name + '.svf')}; exit\""
+              f"-c \"transport select jtag; adapter_khz 10000; init; svf -tap lfe5u45.tap -quiet -progress {os.path.join(builder.gateware_dir, soc.build_name + '.svf')}; exit\""
         subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL)
 
 if __name__ == "__main__":

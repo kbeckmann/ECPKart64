@@ -21,7 +21,7 @@ app:
 	$(V)$(MAKE) -C gateware/sw
 
 $(BUILD_DIR)/gateware/$(TARGET).bit: $(GATEWARE_SRC)
-	$(V)$(PYTHON3) -m gateware.ecpkart64.targets.$(TARGET) --build
+	$(V)$(PYTHON3) -m gateware.ecpkart64.targets.$(TARGET) --build --csr-csv csr.csv
 
 $(BUILD_DIR)/software/app/app.bin:
 
