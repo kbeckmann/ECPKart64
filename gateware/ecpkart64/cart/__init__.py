@@ -32,12 +32,14 @@ class N64Cart(Module, AutoCSR):
         self.ad_oe = n64_ad_oe = Signal()
         self.ad_out = n64_ad_out = Signal(16)
         self.ad_in = n64_ad_in = Signal(16)
+        self.raw_ad = []
         for i in range(16):
             t = TSTriple()
             self.specials += t.get_tristate(pads.ad_io[i])
             self.comb += t.oe.eq(n64_ad_oe)
             self.comb += t.o.eq(n64_ad_out[i])
             self.specials += MultiReg(t.i, n64_ad_in[i])
+            self.raw_ad.append(t)
 
 
         ### WIP: Read a simple demo rom and place it in BRAM
@@ -56,7 +58,7 @@ class N64Cart(Module, AutoCSR):
         # Handle bus access
         n64_addr_l = Signal(16)
         n64_addr_h = Signal(16)
-        n64_addr = Signal(32)
+        self.n64_addr = n64_addr = Signal(32)
         roms_cs = Signal()
 
         # 0x10000000	0x1FBFFFFF	Cartridge Domain 1 Address 2	Cartridge ROM
@@ -80,8 +82,6 @@ class N64Cart(Module, AutoCSR):
             NextValue(led_state, 0b0001),
 
             # Reset values
-            NextValue(n64_ad_oe, 0),
-            NextValue(n64_ad_in, 0),
             NextValue(n64_addr, 0),
 
             # Active low. If high, start.
@@ -94,73 +94,66 @@ class N64Cart(Module, AutoCSR):
 
             NextValue(led_state, led_state | 0b0010),
 
-            NextValue(n64_ad_oe, 0),
-
-            If(n64_alel,
-                If(n64_aleh,
-                    # High part
-                    NextValue(n64_addr_h, n64_ad_in),
-                    NextState("ADDR_H"),
-                ).Else(
-                    # Low part
-                    NextValue(n64_addr_l, n64_ad_in),
-                    NextValue(n64_addr, Cat(0, n64_ad_in[1:], n64_addr_h)),
-                    # Begin RAM access
-                    # NextValue(rom_port.r_en, 1),
-                    NextState("WAIT"),
-                )
+            If(n64_alel & n64_aleh,
+                # High part
+                NextState("WAIT_ADDR_H"),
             ),
 
             # Active low. If high, start.
             If(~n64_cold_reset, NextState("INIT"))
         )
 
-        fsm.act("ADDR_H",
+        fsm.act("WAIT_ADDR_H",
             state.eq(2),
-            NextValue(n64_ad_oe, 0),
             NextValue(led_state, led_state | 0b0100),
 
-            If(n64_alel,
-                If(~n64_aleh,
-                    # Low part
-                    NextValue(n64_addr_l, n64_ad_in),
-                    NextValue(n64_addr, Cat(0, n64_ad_in[1:], n64_addr_h)),
+            If(n64_alel & ~n64_aleh,
+                # Store high part
+                NextValue(n64_addr_h, n64_ad_in),
+                NextState("WAIT_ADDR_L"),
+            ),
 
-                    NextState("ADDR_L"),
-                )
-            )
+            # Active low. If high, start.
+            If(~n64_cold_reset, NextState("INIT"))
         )
 
-        fsm.act("ADDR_L",
+        fsm.act("WAIT_ADDR_L",
             state.eq(3),
-            NextValue(n64_ad_oe, 0),
-    
-            NextState("WAIT"),
+            NextValue(led_state, led_state | 0b0100),
+
+            If(~n64_alel & ~n64_aleh,
+                # Store low part
+                NextValue(n64_addr_l, n64_ad_in),
+                # NextValue(n64_addr, Cat(0, n64_ad_in[1:], n64_addr_h)),
+                NextValue(n64_addr, Cat(n64_ad_in, n64_addr_h)),
+
+                NextState("WAIT_READ_WRITE"),
+            ),
+
+            # Active low. If high, start.
+            If(~n64_cold_reset, NextState("INIT"))
         )
 
         # Wait for read or write. Perform a read request anyway to be ready.
-        fsm.act("WAIT",
+        fsm.act("WAIT_READ_WRITE",
             state.eq(4),
             NextValue(led_state, led_state | 0b1000),
             # While in this state, we are processing the read request.
 
             # Only accept read request if we should handle it
-            If(~n64_read & roms_cs,
-                # dat_r hopefully contains correct data
-                NextValue(n64_ad_out, rom_port.dat_r),
-                
-                # 0x8037FF40
+            #If(~n64_read & roms_cs,
+            If(~n64_read,
                 If(n64_addr[1],
-                    NextValue(n64_ad_out, 0x8037),
+                    n64_ad_out.eq(0x8037),
+                    n64_ad_oe.eq(1),
                 ).Else(
-                    NextValue(n64_ad_out, 0xFF40),
+                    n64_ad_out.eq(0xFF40),
+                    n64_ad_oe.eq(1),
                 ),
 
-                NextValue(n64_ad_oe, 1),
-                NextState("READ"),
-            ).Elif(n64_alel | n64_aleh,
-                # This shouldn't happen, so go back to init and reset signals.
-                NextValue(n64_ad_oe, 0),
+                NextState("WAIT_READ_H"),
+            ).Elif(n64_aleh,
+                # Access done.
                 NextState("START"),
             ),
 
@@ -168,18 +161,26 @@ class N64Cart(Module, AutoCSR):
             If(~n64_cold_reset, NextState("INIT"))
         )
 
-        fsm.act("READ",
-            state.eq(5),
+        fsm.act("WAIT_READ_H",
+            state.eq(4),
             NextValue(led_state, led_state | 0b1000),
             # The data was latched in the previous state. OE = 1 now
+
+            If(n64_addr[1],
+                n64_ad_out.eq(0x8037),
+                n64_ad_oe.eq(1),
+            ).Else(
+                n64_ad_out.eq(0xFF40),
+                n64_ad_oe.eq(1),
+            ),
+
 
             If(n64_read,
                 # Increase address
                 NextValue(n64_addr, n64_addr + 2),
-                NextState("WAIT"),
+                NextState("WAIT_READ_WRITE"),
             ).Elif(n64_alel | n64_aleh,
                 # Request done, return.
-                NextValue(n64_ad_oe, 0),
                 NextState("START"),
             ),
 
