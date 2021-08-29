@@ -34,7 +34,7 @@ $(BUILD_DIR)/gateware/$(TARGET).bit: $(GATEWARE_SRC)
 load_bitstream: bitstream
 	$(V)$(PYTHON3) -m gateware.ecpkart64.targets.$(TARGET) --load
 
-load_app:
+load_app: app
 	$(V)$(MAKE) -C gateware/sw load
 
 
