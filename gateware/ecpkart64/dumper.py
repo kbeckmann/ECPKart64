@@ -27,11 +27,15 @@ def main():
     bus = RemoteClient(csr_csv=args.csr_csv)
     bus.open()
 
+    log_entries = bus.regs.n64_logger_idx.read()
+    print(f"Log entries: {log_entries + 1}")
+
+    base = bus.mems.n64.base
+
     try:
-        for i in range(0, 2048, 128):
-            values = bus.read(0x3000_0000, 128)
-            for j, x in enumerate(values):
-                print(f"{i+j:04X}: {x:08X}")
+        for addr in range(base, base + log_entries * 4, 4):
+            value = bus.read(addr)
+            print(f"{(addr - base)//4:04X}: {value:08X}")
 
     finally:
         bus.close()

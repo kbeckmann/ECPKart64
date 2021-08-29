@@ -126,6 +126,8 @@ class N64CartBus(Module):
 
         self.read_active = n64_read_active = Signal()
 
+        # counter = Signal(32)
+        # self.comb += logger_wr.dat_w.eq(counter)
         self.comb += logger_wr.dat_w.eq(n64_addr)
         self.sync += If(logger_wr.we, logger_wr.we.eq(0))
 
@@ -215,7 +217,8 @@ class N64CartBus(Module):
                 NextValue(n64_read_active, 1),
 
                 # Add a log entry in the logger
-                If(logger_wr.adr < logger_words,
+                If(logger_wr.adr < logger_words - 1,
+                    # NextValue(counter, counter + 1),
                     NextValue(logger_wr.we, 1),
                     NextValue(logger_wr.adr, logger_wr.adr + 1),
                 ),
