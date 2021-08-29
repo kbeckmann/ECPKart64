@@ -22,13 +22,14 @@ all: bitstream app
 
 bitstream: $(BUILD_DIR)/gateware/$(TARGET).bit
 
-app:
+app: $(BUILD_DIR)/software/app/app.bin
+
+$(BUILD_DIR)/software/app/app.bin:
 	$(V)$(MAKE) -C gateware/sw
 
 $(BUILD_DIR)/gateware/$(TARGET).bit: $(GATEWARE_SRC)
 	$(V)$(PYTHON3) -m gateware.ecpkart64.targets.$(TARGET) --build --csr-csv csr.csv --doc
 
-$(BUILD_DIR)/software/app/app.bin:
 
 load_bitstream: bitstream
 	$(V)$(PYTHON3) -m gateware.ecpkart64.targets.$(TARGET) --load
