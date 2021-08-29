@@ -23,7 +23,7 @@ class N64Cart(Module, AutoCSR):
         self.logger_idx = CSRStatus(32, description="Logger index")
 
         # Logging wishbone memory area
-        logger_words = 2048
+        logger_words = 4096
         logger = Memory(width=32, depth=logger_words)
         logger_wr = logger.get_port(write_capable=True)
         logger_rd = logger.get_port(write_capable=False)
@@ -79,6 +79,10 @@ class N64CartBus(Module):
             self.specials += MultiReg(t.i, n64_ad_in[i])
             self.raw_ad.append(t)
 
+        # Keep a register with the previous value
+        n64_ad_in_r = Signal.like(n64_ad_in)
+        self.sync += n64_ad_in_r.eq(n64_ad_in)
+
 
         ### WIP: Read a simple demo rom and place it in BRAM
 
@@ -123,6 +127,7 @@ class N64CartBus(Module):
         self.read_active = n64_read_active = Signal()
 
         self.comb += logger_wr.dat_w.eq(n64_addr)
+        self.sync += If(logger_wr.we, logger_wr.we.eq(0))
 
         self.fsm = fsm = FSM(reset_state="INIT")
         self.submodules += fsm
@@ -163,7 +168,7 @@ class N64CartBus(Module):
 
             If(n64_alel & ~n64_aleh,
                 # Store high part
-                NextValue(n64_addr_h, n64_ad_in),
+                NextValue(n64_addr_h, n64_ad_in_r),
                 NextState("WAIT_ADDR_L"),
             ),
 
@@ -177,9 +182,9 @@ class N64CartBus(Module):
 
             If(~n64_alel & ~n64_aleh,
                 # Store low part
-                NextValue(n64_addr_l, n64_ad_in),
+                NextValue(n64_addr_l, n64_ad_in_r),
                 # NextValue(n64_addr, Cat(0, n64_ad_in[1:], n64_addr_h)),
-                NextValue(n64_addr, Cat(n64_ad_in, n64_addr_h)),
+                NextValue(n64_addr, Cat(n64_ad_in_r, n64_addr_h)),
 
                 NextState("WAIT_READ_WRITE"),
             ),
@@ -205,13 +210,13 @@ class N64CartBus(Module):
 
 
             # Only accept read request if we should handle it
-            #If(~n64_read & roms_cs,
-            If(~n64_read,
+            If(~n64_read & roms_cs,
+            # If(~n64_read,
                 NextValue(n64_read_active, 1),
 
                 # Add a log entry in the logger
                 If(logger_wr.adr < logger_words,
-                    logger_wr.we.eq(1),
+                    NextValue(logger_wr.we, 1),
                     NextValue(logger_wr.adr, logger_wr.adr + 1),
                 ),
 

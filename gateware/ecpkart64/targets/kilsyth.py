@@ -49,7 +49,7 @@ class K4S561632J_UC75(SDRAMModule):
 # CRG ----------------------------------------------------------------------------------------------
 
 class _CRG(Module):
-    def __init__(self, platform, sys_clk_freq, sdram_rate="1:1"):
+    def __init__(self, platform, sys_clk_freq, sdram_rate):
         self.rst = Signal()
         self.clock_domains.cd_sys = ClockDomain()
         if sdram_rate == "1:2":
@@ -74,6 +74,10 @@ class _CRG(Module):
             pll.create_clkout(self.cd_sys2x_ps, 2 * sys_clk_freq, phase=180) # Idealy 90° but needs to be increased.
         else:
            pll.create_clkout(self.cd_sys_ps, sys_clk_freq, phase=90)
+        
+        # 200 MHz clock
+        # self.clock_domains.cd_sys4x = ClockDomain()
+        # pll.create_clkout(self.cd_sys4x, 4 * sys_clk_freq)
 
         # SDRAM clock
         sdram_clk = ClockSignal("sys2x_ps" if sdram_rate == "1:2" else "sys_ps")
@@ -84,7 +88,7 @@ class _CRG(Module):
 class BaseSoC(SoCCore):
     mem_map = {**SoCCore.mem_map}
     def __init__(self, device="LFE5U-45F", revision="1.0", toolchain="trellis",
-        sys_clk_freq=int(50e6), sdram_rate="1:2",
+        sys_clk_freq=int(50e6), sdram_rate="1:1",
         with_led_chaser=True, **kwargs):
         platform = kilsyth.Platform(device=device, revision=revision, toolchain=toolchain)
 
@@ -120,11 +124,11 @@ class BaseSoC(SoCCore):
 
         n64_pads = platform.request("n64")
 
-        # self.submodules.n64 = n64cart = ClockDomainsRenamer("sys2x")(N64Cart(
         self.submodules.n64 = n64cart = N64Cart(
                 pads         = n64_pads,
                 leds         = leds,
-                fast_cd      = "sys2x",
+                fast_cd      = "sys",
+                #fast_cd      = "sys4x",
         )
         self.bus.add_slave("n64", self.n64.bus, region=SoCRegion(origin=0x30000000, size=0x10000))
 
@@ -161,9 +165,9 @@ class BaseSoC(SoCCore):
             n64cart.n64cartbus.state,
         ]
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
-            depth        = 1024 * 4,
-            clock_domain = "sys2x",
-            # clock_domain = "sys",
+            depth        = 1024 * 2,
+            # clock_domain = "sys4x",
+            clock_domain = "sys",
             csr_csv      = "analyzer.csv")
 
         self.add_uartbone(name="serial", baudrate=1000000)
@@ -183,7 +187,7 @@ def main():
     parser.add_argument("--device",          default="LFE5U-45F",   help="FPGA device: LFE5U-12F, LFE5U-25F, LFE5U-45F (default)  or LFE5U-85F")
     parser.add_argument("--revision",        default="1.0",         help="Board revision: 1.0 (default)")
     parser.add_argument("--sys-clk-freq",    default=50e6,          help="System clock frequency  (default: 50MHz)")
-    parser.add_argument("--sdram-rate",      default="1:2",         help="SDRAM Rate: 1:1 Full Rate (default), 1:2 Half Rate")
+    parser.add_argument("--sdram-rate",      default="1:1",         help="SDRAM Rate: 1:1 Full Rate (default), 1:2 Half Rate")
     builder_args(parser)
     soc_core_args(parser)
     trellis_args(parser)
