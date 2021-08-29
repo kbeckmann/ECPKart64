@@ -81,15 +81,17 @@ class N64CartBus(Module):
 
         ### WIP: Read a simple demo rom and place it in BRAM
 
-        with open("bootrom.z64", "rb") as f:
-        # with open("bootrom2.z64", "rb") as f:
-            # Read the first 74kB (37k words) from the bootrom (controller example)
-            rom_words = 37 * 1024
-            # rom_words = 1 * 1024
-            # rom_words = 1024
-            rom_bytes = rom_words
-            rom_data = unpack(f">{rom_words}H", f.read()[:rom_words * 2])
-            # rom_data = pack(f">{rom_words}H", *[(i+3) for i in range(rom_words)])
+        if (os.path.isfile("bootrom.z64"):
+            with open("bootrom.z64", "rb") as f:
+            # with open("bootrom2.z64", "rb") as f:
+                # Read the first 74kB (37k words) from the bootrom (controller example)
+                rom_words = 37 * 1024
+                rom_bytes = rom_words
+                rom_data = unpack(f">{rom_words}H", f.read()[:rom_words * 2])
+        else:
+                rom_words = 16 * 1024
+                rom_bytes = rom_words
+                rom_data = pack(f">{rom_words}H", *[i for i in range(rom_words)])
 
         rom = Memory(width=16, depth=rom_words, init=rom_data)
         rom_port = rom.get_port()
