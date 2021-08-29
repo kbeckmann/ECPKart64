@@ -213,16 +213,16 @@ class N64CartBus(Module):
 
             If(~n64_read,
                 # *Always* add a log entry in the logger even if the req. is not for us
-                If(~roms_cs,
-                    If(logger_wr.adr < logger_words - 1,
-                        # NextValue(counter, counter + 1),
-                        NextValue(logger_wr.we, 1),
-                        NextValue(logger_wr.adr, logger_wr.adr + 1),
-                    ).Else(
-                        NextValue(logger_wr.we, 1),
-                        NextValue(logger_wr.adr, 0),
-                    ),
+                If(logger_wr.adr < logger_words - 1,
+                    # NextValue(counter, counter + 1),
+                    NextValue(logger_wr.we, 1),
+                    NextValue(logger_wr.adr, logger_wr.adr + 1),
                 ),
+                # Uncomment to loop the log
+                # .Else(
+                #     NextValue(logger_wr.we, 1),
+                #     NextValue(logger_wr.adr, 0),
+                # ),
 
                 # Only accept read request if we should handle it
                 If(~n64_read & roms_cs,
