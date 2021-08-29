@@ -1,20 +1,56 @@
+#
+# This file is part of ECPKart64.
+#
 # Copyright (c) 2021 Konrad Beckmann <konrad.beckmann@gmail.com>
 # SPDX-License-Identifier: BSD-2-Clause
 
-from litex.tools.litex_client import read_memory
 from migen import *
-from litex.soc.interconnect.csr import *
 from migen.genlib.cdc import MultiReg
+
+from litex.soc.interconnect import wishbone
+from litex.soc.interconnect.csr import *
 
 from struct import pack, unpack
 
 # N64 Cart integration ---------------------------------------------------------------------------------------
 
-
 class N64Cart(Module, AutoCSR):
-    def __init__(self, pads, leds):
+
+    def __init__(self, pads, leds, fast_cd="sys2x"):
         self.pads = pads
-        self._out = CSRStorage(len(pads), description="placeholder")
+
+        self.logger_idx = CSRStatus(32, description="Logger index")
+
+        # Logging wishbone memory area
+        logger_words = 2048
+        logger = Memory(width=32, depth=logger_words)
+        logger_wr = logger.get_port(write_capable=True)
+        logger_rd = logger.get_port(write_capable=False)
+        self.specials += logger, logger_wr, logger_rd
+
+        # Wishbone interface
+        self.bus = bus = wishbone.Interface(data_width=32)
+
+        # Acknowledge immediately
+        self.sync += [
+            bus.ack.eq(0),
+            If (bus.cyc & bus.stb & ~bus.ack, bus.ack.eq(1))
+        ]
+
+        # Sample the write index from the fast domain
+        self.specials += MultiReg(logger_wr.adr, self.logger_idx.status)
+
+        self.comb += [
+            logger_rd.adr.eq(bus.adr),
+            bus.dat_r.eq(logger_rd.dat_r)
+        ]
+
+        self.submodules.n64cartbus = ClockDomainsRenamer(fast_cd)(N64CartBus(pads, logger_wr, logger_words, leds))
+
+
+class N64CartBus(Module):
+    def __init__(self, pads, logger_wr, logger_words, leds):
+        self.pads = pads
 
         self.cold_reset = n64_cold_reset = Signal()
         self.aleh = n64_aleh = Signal()
@@ -82,6 +118,8 @@ class N64Cart(Module, AutoCSR):
         self.comb += leds.eq(Cat(led_state, n64_read, n64_nmi, n64_aleh, n64_alel))
 
         self.read_active = n64_read_active = Signal()
+
+        self.comb += logger_wr.dat_w.eq(n64_addr)
 
         self.fsm = fsm = FSM(reset_state="INIT")
         self.submodules += fsm
@@ -168,20 +206,18 @@ class N64Cart(Module, AutoCSR):
             If(~n64_read,
                 NextValue(n64_read_active, 1),
 
+                # Add a log entry in the logger
+                If(logger_wr.adr < logger_words,
+                    logger_wr.we.eq(1),
+                    NextValue(logger_wr.adr, logger_wr.adr + 1),
+                ),
+
                 If(n64_addr < 0x10000000 + rom_bytes,
                     n64_ad_out.eq(rom_port.dat_r),
                 ).Else(
                     n64_ad_out.eq(0),
                 ),
                 n64_ad_oe.eq(1),
-
-                # If(n64_addr[1],
-                #     n64_ad_out.eq(0x8037),
-                #     n64_ad_oe.eq(1),
-                # ).Else(
-                #     n64_ad_out.eq(0xFF40),
-                #     n64_ad_oe.eq(1),
-                # ),
 
                 NextState("WAIT_READ_H"),
             ).Elif(n64_aleh,

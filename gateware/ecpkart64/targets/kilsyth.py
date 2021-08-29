@@ -16,6 +16,7 @@ from litex.build.io import DDROutput
 from litex.build.lattice.trellis import trellis_args, trellis_argdict
 
 from litex.soc.cores.clock import *
+from litex.soc.integration.soc import SoCRegion
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
@@ -120,10 +121,13 @@ class BaseSoC(SoCCore):
         n64_pads = platform.request("n64")
 
         # self.submodules.n64 = n64cart = ClockDomainsRenamer("sys2x")(N64Cart(
-        self.submodules.n64 = n64cart = ClockDomainsRenamer("sys")(N64Cart(
+        self.submodules.n64 = n64cart = N64Cart(
                 pads         = n64_pads,
-                leds         = leds
-        ))
+                leds         = leds,
+                fast_cd      = "sys2x",
+        )
+        self.bus.add_slave("n64", self.n64.bus, region=SoCRegion(origin=0x30000000, size=0x10000))
+
 
         n64cic = self.platform.request("n64cic")
         self.submodules.n64cic_si_clk   = GPIOIn(n64cic.si_clk)
@@ -141,25 +145,25 @@ class BaseSoC(SoCCore):
             # n64_pads.read,
             # n64_pads.write,
             # n64cart.cold_reset,
-            n64cart.aleh,
-            n64cart.alel,
-            n64cart.read,
-            n64cart.write,
-            # n64cart.nmi,
+            n64cart.n64cartbus.aleh,
+            n64cart.n64cartbus.alel,
+            n64cart.n64cartbus.read,
+            n64cart.n64cartbus.write,
+            # n64cart.n64cartbus.nmi,
 
-            n64cart.ad_oe,
-            n64cart.ad_out,
-            n64cart.ad_in,
+            n64cart.n64cartbus.ad_oe,
+            n64cart.n64cartbus.ad_out,
+            n64cart.n64cartbus.ad_in,
 
-            n64cart.n64_addr,
-            n64cart.read_active,
+            n64cart.n64cartbus.n64_addr,
+            n64cart.n64cartbus.read_active,
 
-            n64cart.state,
+            n64cart.n64cartbus.state,
         ]
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
             depth        = 1024 * 4,
-            # clock_domain = "sys2x",
-            clock_domain = "sys",
+            clock_domain = "sys2x",
+            # clock_domain = "sys",
             csr_csv      = "analyzer.csv")
 
         self.add_uartbone(name="serial", baudrate=1000000)
