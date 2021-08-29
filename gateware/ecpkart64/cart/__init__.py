@@ -91,11 +91,11 @@ class N64CartBus(Module):
             # with open("bootrom2.z64", "rb") as f:
                 # Read the first 74kB (37k words) from the bootrom (controller example)
                 rom_words = 37 * 1024
-                rom_bytes = rom_words
+                rom_bytes = rom_words * 2
                 rom_data = unpack(f">{rom_words}H", f.read()[:rom_words * 2])
         else:
             rom_words = 16 * 1024
-            rom_bytes = rom_words
+            rom_bytes = rom_words * 2
             rom_data = pack(f">{rom_words}H", *[i for i in range(rom_words)])
 
         rom = Memory(width=16, depth=rom_words, init=rom_data)
@@ -211,26 +211,33 @@ class N64CartBus(Module):
             ),
 
 
-            # Only accept read request if we should handle it
-            If(~n64_read & roms_cs,
-            # If(~n64_read,
-                NextValue(n64_read_active, 1),
-
-                # Add a log entry in the logger
-                If(logger_wr.adr < logger_words - 1,
-                    # NextValue(counter, counter + 1),
-                    NextValue(logger_wr.we, 1),
-                    NextValue(logger_wr.adr, logger_wr.adr + 1),
+            If(~n64_read,
+                # *Always* add a log entry in the logger even if the req. is not for us
+                If(~roms_cs,
+                    If(logger_wr.adr < logger_words - 1,
+                        # NextValue(counter, counter + 1),
+                        NextValue(logger_wr.we, 1),
+                        NextValue(logger_wr.adr, logger_wr.adr + 1),
+                    ).Else(
+                        NextValue(logger_wr.we, 1),
+                        NextValue(logger_wr.adr, 0),
+                    ),
                 ),
 
-                If(n64_addr < 0x10000000 + rom_bytes,
-                    n64_ad_out.eq(rom_port.dat_r),
-                ).Else(
-                    n64_ad_out.eq(0),
-                ),
-                n64_ad_oe.eq(1),
+                # Only accept read request if we should handle it
+                If(~n64_read & roms_cs,
+                    NextValue(n64_read_active, 1),
 
-                NextState("WAIT_READ_H"),
+
+                    If(n64_addr < 0x10000000 + rom_bytes,
+                        n64_ad_out.eq(rom_port.dat_r),
+                    ).Else(
+                        n64_ad_out.eq(0),
+                    ),
+                    n64_ad_oe.eq(1),
+
+                    NextState("WAIT_READ_H"),
+                ),
             ).Elif(n64_aleh,
                 # Access done.
                 NextValue(n64_read_active, 0),
