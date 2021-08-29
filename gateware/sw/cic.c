@@ -39,6 +39,8 @@ https://github.com/jago85/UltraCIC_C/blob/master/cic_c.c
 
 #include "cic.h"
 
+#define DEBUG
+
 #define REGION_NTSC (0)
 #define REGION_PAL  (1)
 
@@ -153,9 +155,9 @@ void WriteBit(unsigned char b)
     } while (vin & 1);
 
     // Delay a bit to get a 90 degree phase shift (not needed)
-    for (i = 0; i < 50; i++) {
-        n64cic_cic_dclk_in_read();
-    }
+    // for (i = 0; i < 50; i++) {
+    //     n64cic_cic_dclk_in_read();
+    // }
 
     if (b == 0)
     {
@@ -169,10 +171,10 @@ void WriteBit(unsigned char b)
         vin = n64cic_cic_dclk_in_read();
     } while ((vin & 1) == 0);
 
-    // Delay a bit..
-    for (i = 0; i < 50; i++) {
-        n64cic_cic_dclk_in_read();
-    }
+    // // Delay a bit..
+    // for (i = 0; i < 50; i++) {
+    //     n64cic_cic_dclk_in_read();
+    // }
 
     // Disable output
     n64cic_cic_dio_oe_write(0);
@@ -222,6 +224,21 @@ void WriteSeed(void)
 
     EncodeRound(0x0a);
     EncodeRound(0x0a);
+
+#ifdef DEBUG
+
+    unsigned char index = 0x0a;
+    printf("Seed: ");
+    do
+    {
+        printf("%X ", (_CicMem[index]));
+        index++;
+    } while ((index & 0x0f) != 0);
+    printf("\n");
+
+#endif
+
+
     WriteRamNibbles(0x0a);
 }
 
@@ -234,6 +251,10 @@ void WriteChecksum(void)
 
     // wait for DCLK to go low
     // (doesn't seem to be necessary)
+    int vin;
+    do {
+        vin = n64cic_cic_dclk_in_read();
+    } while (vin & 1);
 
     // "encrytion" key
     // initial value doesn't matter
@@ -246,6 +267,19 @@ void WriteChecksum(void)
     EncodeRound(0x00);
     EncodeRound(0x00);
     EncodeRound(0x00);
+
+#ifdef DEBUG
+
+    unsigned char index = 0;
+    printf("Checksum: ");
+    do
+    {
+        printf("%X ", (_CicMem[index]));
+        index++;
+    } while ((index & 0x0f) != 0);
+    printf("\n");
+
+#endif
 
     // signal that we are done to the pif
     // (test with WriteBit(1) also worked)
@@ -381,9 +415,9 @@ void CompareMode(unsigned char isPal)
 {
     unsigned char ramPtr;
     // don't care about the low ram as we don't check this
- CicRound(&_CicMem[0x00]);
- CicRound(&_CicMem[0x00]);
- CicRound(&_CicMem[0x00]);
+//  CicRound(&_CicMem[0x00]);
+//  CicRound(&_CicMem[0x00]);
+//  CicRound(&_CicMem[0x00]);
 
     // only need to calculate the high ram
     CicRound(&_CicMem[0x10]);
@@ -471,9 +505,9 @@ void main_cic(void)
 
     n64cic_cic_dio_oe_write(0);
 
-    for (int i = 0; i < 32; i++) {
-        printf("%02X ", _CicRamInitNtsc[i]);
-    }
+    // for (int i = 0; i < 32; i++) {
+    //     printf("%02X ", _CicRamInitNtsc[i]);
+    // }
 
     printf("CIC: Wait for reset...\n");
     // Wait for reset

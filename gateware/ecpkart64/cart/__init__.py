@@ -46,10 +46,12 @@ class N64Cart(Module, AutoCSR):
         ### WIP: Read a simple demo rom and place it in BRAM
 
         with open("bootrom.z64", "rb") as f:
+        # with open("bootrom2.z64", "rb") as f:
             # Read the first 74kB (37k words) from the bootrom (controller example)
             rom_words = 37 * 1024
             # rom_words = 1 * 1024
             # rom_words = 1024
+            rom_bytes = rom_words
             rom_data = unpack(f">{rom_words}H", f.read()[:rom_words * 2])
             # rom_data = pack(f">{rom_words}H", *[(i+3) for i in range(rom_words)])
 
@@ -152,7 +154,11 @@ class N64Cart(Module, AutoCSR):
             # While in this state, we are processing the read request.
 
             If(n64_read_active,
-                n64_ad_out.eq(rom_port.dat_r),
+                If(n64_addr < 0x10000000 + rom_bytes,
+                    n64_ad_out.eq(rom_port.dat_r),
+                ).Else(
+                    n64_ad_out.eq(0),
+                ),
                 n64_ad_oe.eq(1),
             ),
 
@@ -162,7 +168,11 @@ class N64Cart(Module, AutoCSR):
             If(~n64_read,
                 NextValue(n64_read_active, 1),
 
-                n64_ad_out.eq(rom_port.dat_r),
+                If(n64_addr < 0x10000000 + rom_bytes,
+                    n64_ad_out.eq(rom_port.dat_r),
+                ).Else(
+                    n64_ad_out.eq(0),
+                ),
                 n64_ad_oe.eq(1),
 
                 # If(n64_addr[1],
@@ -176,6 +186,7 @@ class N64Cart(Module, AutoCSR):
                 NextState("WAIT_READ_H"),
             ).Elif(n64_aleh,
                 # Access done.
+                NextValue(n64_read_active, 0),
                 NextState("START"),
             ),
 
@@ -188,7 +199,11 @@ class N64Cart(Module, AutoCSR):
             NextValue(led_state, led_state | 0b1000),
             # The data was latched in the previous state. OE = 1 now
 
-            n64_ad_out.eq(rom_port.dat_r),
+            If(n64_addr < 0x10000000 + rom_bytes,
+                n64_ad_out.eq(rom_port.dat_r),
+            ).Else(
+                n64_ad_out.eq(0),
+            ),
             n64_ad_oe.eq(1),
 
             If(n64_read,

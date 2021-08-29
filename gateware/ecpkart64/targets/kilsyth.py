@@ -119,10 +119,11 @@ class BaseSoC(SoCCore):
 
         n64_pads = platform.request("n64")
 
-        self.submodules.n64 = n64cart = N64Cart(
+        # self.submodules.n64 = n64cart = ClockDomainsRenamer("sys2x")(N64Cart(
+        self.submodules.n64 = n64cart = ClockDomainsRenamer("sys")(N64Cart(
                 pads         = n64_pads,
                 leds         = leds
-        )
+        ))
 
         n64cic = self.platform.request("n64cic")
         self.submodules.n64cic_si_clk   = GPIOIn(n64cic.si_clk)
@@ -156,10 +157,10 @@ class BaseSoC(SoCCore):
             n64cart.state,
         ]
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
-            depth        = 1024 * 2,
+            depth        = 1024 * 4,
+            # clock_domain = "sys2x",
             clock_domain = "sys",
             csr_csv      = "analyzer.csv")
-        self.add_csr("analyzer")
 
         self.add_uartbone(name="serial", baudrate=1000000)
 
