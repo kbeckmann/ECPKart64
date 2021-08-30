@@ -9,6 +9,8 @@ import os
 import argparse
 import subprocess
 
+from math import log2, ceil
+
 from migen import *
 
 from litex.build.io import DDROutput
@@ -19,8 +21,11 @@ from litex.soc.cores.clock import *
 from litex.soc.integration.soc import SoCRegion
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
+from litex.soc.interconnect import wishbone
 from litex.soc.cores.led import LedChaser
 from litex.soc.cores.gpio import GPIOTristate, GPIOIn
+
+from litedram.frontend.wishbone import LiteDRAMWishbone2Native
 
 from litedram.phy import GENSDRPHY, HalfRateGENSDRPHY
 
@@ -124,6 +129,14 @@ class BaseSoC(SoCCore):
             # l2_cache_reverse = False
         )
 
+        # Add an extra dedicated wishbone bus for the n64 cart
+        user_port = self.sdram.crossbar.get_port(data_width=32)
+        sdram_wb = wishbone.Interface(
+            user_port.data_width,
+            user_port.address_width)
+        wishbone2native = LiteDRAMWishbone2Native(sdram_wb, user_port)
+        self.submodules += wishbone2native
+
 
         # Leds -------------------------------------------------------------------------------------
 
@@ -139,11 +152,11 @@ class BaseSoC(SoCCore):
         self.submodules.n64 = n64cart = N64Cart(
                 pads         = n64_pads,
                 leds         = leds,
+                sdram_wb     = sdram_wb,
                 fast_cd      = "sys",
                 #fast_cd      = "sys4x",
         )
         self.bus.add_slave("n64slave", self.n64.wb_slave, region=SoCRegion(origin=0x30000000, size=0x10000))
-        self.bus.add_master("n64master", self.n64.wb_master)
 
 
         n64cic = self.platform.request("n64cic")
@@ -178,10 +191,10 @@ class BaseSoC(SoCCore):
             n64cart.n64cartbus.state,
 
             n64cart.n64cartbus.wb_data_r,
-            n64cart.wb_master.adr, # might not be needed..
-            n64cart.wb_master.stb,
-            n64cart.wb_master.cyc,
-            n64cart.wb_master.ack,
+            sdram_wb.adr, # might not be needed..
+            sdram_wb.stb,
+            sdram_wb.cyc,
+            sdram_wb.ack,
         ]
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
             depth        = 1024 * 6,
@@ -206,7 +219,7 @@ def main():
     parser.add_argument("--device",          default="LFE5U-45F",   help="FPGA device: LFE5U-12F, LFE5U-25F, LFE5U-45F (default)  or LFE5U-85F")
     parser.add_argument("--revision",        default="1.0",         help="Board revision: 1.0 (default)")
     parser.add_argument("--sys-clk-freq",    default=50e6,          help="System clock frequency  (default: 50MHz)")
-    parser.add_argument("--sdram-rate",      default="1:1",         help="SDRAM Rate: 1:1 Full Rate (default), 1:2 Half Rate")
+    parser.add_argument("--sdram-rate",      default="1:2",         help="SDRAM Rate: 1:1 Full Rate (default), 1:2 Half Rate")
     builder_args(parser)
     soc_core_args(parser)
     trellis_args(parser)

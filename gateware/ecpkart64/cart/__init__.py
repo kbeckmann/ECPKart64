@@ -17,7 +17,7 @@ import os
 
 class N64Cart(Module, AutoCSR):
 
-    def __init__(self, pads, leds, fast_cd="sys2x"):
+    def __init__(self, pads, leds, sdram_wb, fast_cd="sys2x"):
         self.pads = pads
 
         self.logger_idx = CSRStatus(32, description="Logger index")
@@ -46,12 +46,11 @@ class N64Cart(Module, AutoCSR):
             wb_slave.dat_r.eq(logger_rd.dat_r)
         ]
 
-        self.submodules.n64cartbus = n64cartbus = N64CartBus(pads, logger_wr, logger_words, leds)
-        self.wb_master = n64cartbus.wb_master
+        self.submodules.n64cartbus = n64cartbus = N64CartBus(pads, sdram_wb, logger_wr, logger_words, leds)
 
 
 class N64CartBus(Module):
-    def __init__(self, pads, logger_wr, logger_words, leds):
+    def __init__(self, pads, sdram_wb, logger_wr, logger_words, leds):
         self.pads = pads
 
         self.cold_reset = n64_cold_reset = Signal()
@@ -122,20 +121,21 @@ class N64CartBus(Module):
                      )
 
         # WB Master
-        self.wb_master = wb_master = wishbone.Interface()
+        self.sdram_wb = sdram_wb
         wb_data   = Signal(16)
         self.wb_data_r = wb_data_r = Signal(16)
 
         self.comb += [
-            wb_master.adr.eq(n64_addr[2:27] | (0x4000_0000 >> 2)),
-            wb_master.sel.eq(0b1111),
-            wb_master.we.eq(0),
+            sdram_wb.adr.eq(n64_addr[2:27]),
+            # sdram_wb.adr.eq(n64_addr[2:27] | (0x4000_0000 >> 2)),
+            sdram_wb.sel.eq(0b1111),
+            sdram_wb.we.eq(0),
             wb_data.eq(Mux(n64_addr[1],
-                Cat(wb_master.dat_r[24:32], wb_master.dat_r[16:24]),
-                Cat(wb_master.dat_r[ 8:16], wb_master.dat_r[ 0: 8])
+                Cat(sdram_wb.dat_r[24:32], sdram_wb.dat_r[16:24]),
+                Cat(sdram_wb.dat_r[ 8:16], sdram_wb.dat_r[ 0: 8])
             )),
         ]
-        self.sync += If(wb_master.ack, wb_data_r.eq(wb_data))
+        self.sync += If(sdram_wb.ack, wb_data_r.eq(wb_data))
 
 
 
@@ -241,11 +241,11 @@ class N64CartBus(Module):
                 # Only accept read request if we should handle it
                 If(~n64_read & roms_cs,
                     # Perform read request on the wishbone bus
-                    wb_master.stb.eq(1),
-                    wb_master.cyc.eq(1),
+                    sdram_wb.stb.eq(1),
+                    sdram_wb.cyc.eq(1),
 
                     # Go to next state when we get the ack
-                    If(wb_master.ack,
+                    If(sdram_wb.ack,
                         NextValue(n64_read_active, 1),
                         NextState("WAIT_READ_H"),
                     ),
