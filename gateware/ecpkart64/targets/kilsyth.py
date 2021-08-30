@@ -51,7 +51,8 @@ class K4S561632J_UC75(SDRAMModule):
     # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=40, tRCD=40, tWR=40, tRFC=(None, 128), tFAW=None, tRAS=100)}
 
     technology_timings = _TechnologyTimings(tREFI=64e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
-    speedgrade_timings = {"default": _SpeedgradeTimings(tRP=20, tRCD=20, tWR=15, tRFC=(None, 66), tFAW=None, tRAS=44)}
+    # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=20, tRCD=20, tWR=15, tRFC=(None, 66), tFAW=None, tRAS=44)}
+    speedgrade_timings = {"default": _SpeedgradeTimings(tRP=10, tRCD=10, tWR=10, tRFC=(None, 65), tFAW=None, tRAS=44)}
 
 
 # CRG ----------------------------------------------------------------------------------------------
@@ -130,12 +131,13 @@ class BaseSoC(SoCCore):
         )
 
         # Add an extra dedicated wishbone bus for the n64 cart
-        user_port = self.sdram.crossbar.get_port(data_width=32)
-        sdram_wb = wishbone.Interface(
-            user_port.data_width,
-            user_port.address_width)
-        wishbone2native = LiteDRAMWishbone2Native(sdram_wb, user_port)
-        self.submodules += wishbone2native
+        # user_port = self.sdram.crossbar.get_port(data_width=32)
+        # sdram_wb = wishbone.Interface(
+        #     user_port.data_width,
+        #     user_port.address_width)
+        # wishbone2native = LiteDRAMWishbone2Native(sdram_wb, user_port)
+        # self.submodules += wishbone2native
+        sdram_port = self.sdram.crossbar.get_port(data_width=32)
 
 
         # Leds -------------------------------------------------------------------------------------
@@ -152,7 +154,7 @@ class BaseSoC(SoCCore):
         self.submodules.n64 = n64cart = N64Cart(
                 pads         = n64_pads,
                 leds         = leds,
-                sdram_wb     = sdram_wb,
+                sdram_port   = sdram_port,
                 fast_cd      = "sys",
                 #fast_cd      = "sys4x",
         )
@@ -190,11 +192,14 @@ class BaseSoC(SoCCore):
 
             n64cart.n64cartbus.state,
 
-            n64cart.n64cartbus.wb_data_r,
-            sdram_wb.adr, # might not be needed..
-            sdram_wb.stb,
-            sdram_wb.cyc,
-            sdram_wb.ack,
+            # n64cart.n64cartbus.wb_data_r,
+            sdram_port.cmd.addr, # might not be needed..
+            sdram_port.flush,
+            sdram_port.cmd.valid,
+            sdram_port.cmd.ready,
+            sdram_port.rdata.ready,
+            sdram_port.rdata.valid,
+            sdram_port.rdata.data,
         ]
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
             depth        = 1024 * 6,

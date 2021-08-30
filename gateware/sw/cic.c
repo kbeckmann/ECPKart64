@@ -543,11 +543,11 @@ void main_cic(void)
 
     while(1)
     {
-        if(readchar_nonblock()) {
-            char c = readchar();
-            printf("Bye! (%02X)\n", c);
-            break;
-        }
+        // if(readchar_nonblock()) {
+        //     char c = readchar();
+        //     printf("Bye! (%02X)\n", c);
+        //     break;
+        // }
 
         // read mode (2 bit)
         unsigned char cmd = 0;

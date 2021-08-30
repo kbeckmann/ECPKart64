@@ -17,7 +17,7 @@ import os
 
 class N64Cart(Module, AutoCSR):
 
-    def __init__(self, pads, leds, sdram_wb, fast_cd="sys2x"):
+    def __init__(self, pads, leds, sdram_port, fast_cd="sys2x"):
         self.pads = pads
 
         self.logger_idx = CSRStatus(32, description="Logger index")
@@ -46,11 +46,11 @@ class N64Cart(Module, AutoCSR):
             wb_slave.dat_r.eq(logger_rd.dat_r)
         ]
 
-        self.submodules.n64cartbus = n64cartbus = N64CartBus(pads, sdram_wb, logger_wr, logger_words, leds)
+        self.submodules.n64cartbus = n64cartbus = N64CartBus(pads, sdram_port, logger_wr, logger_words, leds)
 
 
 class N64CartBus(Module):
-    def __init__(self, pads, sdram_wb, logger_wr, logger_words, leds):
+    def __init__(self, pads, sdram_port, logger_wr, logger_words, leds):
         self.pads = pads
 
         self.cold_reset = n64_cold_reset = Signal()
@@ -120,22 +120,23 @@ class N64CartBus(Module):
                         roms_cs.eq(1),
                      )
 
-        # WB Master
-        self.sdram_wb = sdram_wb
-        wb_data   = Signal(16)
-        self.wb_data_r = wb_data_r = Signal(16)
+        # SDRAM direct port
+        self.sdram_port = sdram_port
+        sdram_data   = Signal(16)
+        self.sdram_data_r = sdram_data_r = Signal(16)
 
         self.comb += [
-            sdram_wb.adr.eq(n64_addr[2:27]),
-            # sdram_wb.adr.eq(n64_addr[2:27] | (0x4000_0000 >> 2)),
-            sdram_wb.sel.eq(0b1111),
-            sdram_wb.we.eq(0),
-            wb_data.eq(Mux(n64_addr[1],
-                Cat(sdram_wb.dat_r[24:32], sdram_wb.dat_r[16:24]),
-                Cat(sdram_wb.dat_r[ 8:16], sdram_wb.dat_r[ 0: 8])
+            sdram_port.cmd.addr.eq(n64_addr[2:27]),
+            sdram_port.cmd.we.eq(0),
+            sdram_port.cmd.last.eq(1),
+            sdram_port.rdata.ready.eq(1),
+            sdram_port.flush.eq(0),
+            sdram_data.eq(Mux(n64_addr[1],
+                Cat(sdram_port.rdata.data[24:32], sdram_port.rdata.data[16:24]),
+                Cat(sdram_port.rdata.data[ 8:16], sdram_port.rdata.data[ 0: 8])
             )),
         ]
-        self.sync += If(sdram_wb.ack, wb_data_r.eq(wb_data))
+        self.sync += If(sdram_port.rdata.valid, sdram_data_r.eq(sdram_data))
 
 
 
@@ -221,7 +222,7 @@ class N64CartBus(Module):
             # While in this state, we are processing the read request.
 
             If(n64_read_active,
-                n64_ad_out.eq(wb_data_r),
+                n64_ad_out.eq(sdram_data_r),
                 n64_ad_oe.eq(1),
             ),
 
@@ -241,11 +242,10 @@ class N64CartBus(Module):
                 # Only accept read request if we should handle it
                 If(~n64_read & roms_cs,
                     # Perform read request on the wishbone bus
-                    sdram_wb.stb.eq(1),
-                    sdram_wb.cyc.eq(1),
+                    sdram_port.cmd.valid.eq(1),
 
                     # Go to next state when we get the ack
-                    If(sdram_wb.ack,
+                    If(sdram_port.cmd.ready & sdram_port.rdata.valid,
                         NextValue(n64_read_active, 1),
                         NextState("WAIT_READ_H"),
                     ),
@@ -265,7 +265,7 @@ class N64CartBus(Module):
             NextValue(led_state, led_state | 0b1000),
             # The data was latched in the previous state. OE = 1 now
 
-            n64_ad_out.eq(wb_data_r),
+            n64_ad_out.eq(sdram_data_r),
             n64_ad_oe.eq(1),
 
             If(n64_read,
