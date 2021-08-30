@@ -42,8 +42,11 @@ class K4S561632J_UC75(SDRAMModule):
     nrows  = 8192
     ncols  = 512
     # timings
+    # technology_timings = _TechnologyTimings(tREFI=64e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
+    # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=40, tRCD=40, tWR=40, tRFC=(None, 128), tFAW=None, tRAS=100)}
+
     technology_timings = _TechnologyTimings(tREFI=64e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
-    speedgrade_timings = {"default": _SpeedgradeTimings(tRP=40, tRCD=40, tWR=40, tRFC=(None, 128), tFAW=None, tRAS=100)}
+    speedgrade_timings = {"default": _SpeedgradeTimings(tRP=20, tRCD=20, tWR=15, tRFC=(None, 66), tFAW=None, tRAS=44)}
 
 
 # CRG ----------------------------------------------------------------------------------------------
@@ -88,30 +91,39 @@ class _CRG(Module):
 class BaseSoC(SoCCore):
     mem_map = {**SoCCore.mem_map}
     def __init__(self, device="LFE5U-45F", revision="1.0", toolchain="trellis",
-        sys_clk_freq=int(50e6), sdram_rate="1:1",
-        with_led_chaser=True, **kwargs):
+        sys_clk_freq=int(50e6), sdram_rate="1:2",
+        with_led_chaser=True,
+        **kwargs):
         platform = kilsyth.Platform(device=device, revision=revision, toolchain=toolchain)
 
         # SoCCore ----------------------------------------------------------------------------------
         SoCCore.__init__(self, platform, sys_clk_freq,
             ident          = "LiteX SoC on Kilsyth",
             ident_version  = True,
+            uart_baudrate  = 1000000,
             **kwargs)
 
         # CRG --------------------------------------------------------------------------------------
         self.submodules.crg = _CRG(platform, sys_clk_freq, sdram_rate=sdram_rate)
 
+        # Firmware RAM (To ease initial LiteDRAM calibration support) ------------------------------
+        self.add_ram("firmware_ram", 0x20000000, 0x4000)
+
         # SDR SDRAM --------------------------------------------------------------------------------
-        if not self.integrated_main_ram_size:
-            sdrphy_cls = HalfRateGENSDRPHY if sdram_rate == "1:2" else GENSDRPHY
-            self.submodules.sdrphy = sdrphy_cls(platform.request("sdram"), sys_clk_freq)
-            self.add_sdram("sdram",
-                phy              = self.sdrphy,
-                module           = K4S561632J_UC75(sys_clk_freq, sdram_rate),
-                size             = 32 * 1024 * 1024,
-                l2_cache_size    = kwargs.get("l2_size", 8192),
-                l2_cache_reverse = False
-            )
+        # if not self.integrated_main_ram_size:
+        sdrphy_cls = HalfRateGENSDRPHY if sdram_rate == "1:2" else GENSDRPHY
+        self.submodules.sdrphy = sdrphy_cls(platform.request("sdram"), sys_clk_freq)
+        self.add_sdram("sdram",
+            phy              = self.sdrphy,
+            module           = K4S561632J_UC75(sys_clk_freq, sdram_rate),
+            size             = 32 * 1024 * 1024,
+            # l2_cache_size    = kwargs.get("l2_size", 8192),
+            # l2_cache_reverse = False
+
+            l2_cache_size    = 0,
+            # l2_cache_reverse = False
+        )
+
 
         # Leds -------------------------------------------------------------------------------------
 
@@ -130,7 +142,8 @@ class BaseSoC(SoCCore):
                 fast_cd      = "sys",
                 #fast_cd      = "sys4x",
         )
-        self.bus.add_slave("n64", self.n64.bus, region=SoCRegion(origin=0x30000000, size=0x10000))
+        self.bus.add_slave("n64slave", self.n64.wb_slave, region=SoCRegion(origin=0x30000000, size=0x10000))
+        self.bus.add_master("n64master", self.n64.wb_master)
 
 
         n64cic = self.platform.request("n64cic")
@@ -163,14 +176,20 @@ class BaseSoC(SoCCore):
             n64cart.n64cartbus.read_active,
 
             n64cart.n64cartbus.state,
+
+            n64cart.n64cartbus.wb_data_r,
+            n64cart.wb_master.adr, # might not be needed..
+            n64cart.wb_master.stb,
+            n64cart.wb_master.cyc,
+            n64cart.wb_master.ack,
         ]
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
-            depth        = 1024 * 2,
-            # clock_domain = "sys4x",
+            depth        = 1024 * 6,
             clock_domain = "sys",
             csr_csv      = "analyzer.csv")
 
         self.add_uartbone(name="serial", baudrate=1000000)
+        # self.add_uartbone(name="serial", baudrate=3000000)
 
 
 

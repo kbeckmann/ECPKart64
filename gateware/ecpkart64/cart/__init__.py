@@ -29,24 +29,25 @@ class N64Cart(Module, AutoCSR):
         logger_rd = logger.get_port(write_capable=False)
         self.specials += logger, logger_wr, logger_rd
 
-        # Wishbone interface
-        self.bus = bus = wishbone.Interface(data_width=32)
+        # Wishbone slave interface
+        self.wb_slave = wb_slave = wishbone.Interface()
 
         # Acknowledge immediately
         self.sync += [
-            bus.ack.eq(0),
-            If (bus.cyc & bus.stb & ~bus.ack, bus.ack.eq(1))
+            wb_slave.ack.eq(0),
+            If (wb_slave.cyc & wb_slave.stb & ~wb_slave.ack, wb_slave.ack.eq(1))
         ]
 
         # Sample the write index from the fast domain
         self.specials += MultiReg(logger_wr.adr, self.logger_idx.status)
 
         self.comb += [
-            logger_rd.adr.eq(bus.adr),
-            bus.dat_r.eq(logger_rd.dat_r)
+            logger_rd.adr.eq(wb_slave.adr),
+            wb_slave.dat_r.eq(logger_rd.dat_r)
         ]
 
-        self.submodules.n64cartbus = ClockDomainsRenamer(fast_cd)(N64CartBus(pads, logger_wr, logger_words, leds))
+        self.submodules.n64cartbus = n64cartbus = N64CartBus(pads, logger_wr, logger_words, leds)
+        self.wb_master = n64cartbus.wb_master
 
 
 class N64CartBus(Module):
@@ -119,6 +120,24 @@ class N64CartBus(Module):
                         rom_port.adr.eq(n64_addr[1:24]),
                         roms_cs.eq(1),
                      )
+
+        # WB Master
+        self.wb_master = wb_master = wishbone.Interface()
+        wb_data   = Signal(16)
+        self.wb_data_r = wb_data_r = Signal(16)
+
+        self.comb += [
+            wb_master.adr.eq(n64_addr[2:27] | (0x4000_0000 >> 2)),
+            wb_master.sel.eq(0b1111),
+            wb_master.we.eq(0),
+            wb_data.eq(Mux(n64_addr[1],
+                Cat(wb_master.dat_r[24:32], wb_master.dat_r[16:24]),
+                Cat(wb_master.dat_r[ 8:16], wb_master.dat_r[ 0: 8])
+            )),
+        ]
+        self.sync += If(wb_master.ack, wb_data_r.eq(wb_data))
+
+
 
         led_state = Signal(4)
         # self.comb += leds.eq(Cat(led_state, n64_read, n64_write, n64_aleh, n64_alel))
@@ -202,14 +221,9 @@ class N64CartBus(Module):
             # While in this state, we are processing the read request.
 
             If(n64_read_active,
-                If(n64_addr < 0x10000000 + rom_bytes,
-                    n64_ad_out.eq(rom_port.dat_r),
-                ).Else(
-                    n64_ad_out.eq(0),
-                ),
+                n64_ad_out.eq(wb_data_r),
                 n64_ad_oe.eq(1),
             ),
-
 
             If(~n64_read,
                 # *Always* add a log entry in the logger even if the req. is not for us
@@ -226,17 +240,15 @@ class N64CartBus(Module):
 
                 # Only accept read request if we should handle it
                 If(~n64_read & roms_cs,
-                    NextValue(n64_read_active, 1),
+                    # Perform read request on the wishbone bus
+                    wb_master.stb.eq(1),
+                    wb_master.cyc.eq(1),
 
-
-                    If(n64_addr < 0x10000000 + rom_bytes,
-                        n64_ad_out.eq(rom_port.dat_r),
-                    ).Else(
-                        n64_ad_out.eq(0),
+                    # Go to next state when we get the ack
+                    If(wb_master.ack,
+                        NextValue(n64_read_active, 1),
+                        NextState("WAIT_READ_H"),
                     ),
-                    n64_ad_oe.eq(1),
-
-                    NextState("WAIT_READ_H"),
                 ),
             ).Elif(n64_aleh,
                 # Access done.
@@ -253,11 +265,7 @@ class N64CartBus(Module):
             NextValue(led_state, led_state | 0b1000),
             # The data was latched in the previous state. OE = 1 now
 
-            If(n64_addr < 0x10000000 + rom_bytes,
-                n64_ad_out.eq(rom_port.dat_r),
-            ).Else(
-                n64_ad_out.eq(0),
-            ),
+            n64_ad_out.eq(wb_data_r),
             n64_ad_oe.eq(1),
 
             If(n64_read,

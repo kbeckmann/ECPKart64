@@ -9,6 +9,7 @@
 #include <uart.h>
 #include <console.h>
 #include <generated/csr.h>
+#include <generated/mem.h>
 
 #include "cic.h"
 
@@ -132,6 +133,110 @@ static void led_cmd(void)
 }
 #endif
 
+#define NUMBER_OF_BYTES_ON_A_LINE 16
+void dump_bytes(unsigned int *ptr, int count, unsigned long addr)
+{
+	char *data = (char *)ptr;
+	int line_bytes = 0, i = 0;
+
+	putsnonl("Memory dump:");
+	while (count > 0) {
+		line_bytes =
+			(count > NUMBER_OF_BYTES_ON_A_LINE)?
+				NUMBER_OF_BYTES_ON_A_LINE : count;
+
+		printf("\n0x%08lx  ", addr);
+		for (i = 0; i < line_bytes; i++)
+			printf("%02x ", *(unsigned char *)(data+i));
+
+		for (; i < NUMBER_OF_BYTES_ON_A_LINE; i++)
+			printf("   ");
+
+		printf(" ");
+
+		for (i = 0; i<line_bytes; i++) {
+			if ((*(data+i) < 0x20) || (*(data+i) > 0x7e))
+				printf(".");
+			else
+				printf("%c", *(data+i));
+		}
+
+		for (; i < NUMBER_OF_BYTES_ON_A_LINE; i++)
+			printf(" ");
+
+		data += (char)line_bytes;
+		count -= line_bytes;
+		addr += line_bytes;
+	}
+	printf("\n");
+}
+
+static void mem_read(void)
+{
+	dump_bytes((unsigned int *) MAIN_RAM_BASE, 0x200, MAIN_RAM_BASE);
+}
+
+static void mem_init(void)
+{
+	uint32_t *buf = (unsigned int *) MAIN_RAM_BASE;
+	for (uint32_t i = 0; i < 256; i++) {
+		buf[i] = i;
+	}
+}
+
+static void rom_load(char *words_str)
+{
+	char *c;
+	uint32_t *buf = (unsigned int *) MAIN_RAM_BASE;
+
+	union {
+		uint32_t word;
+		uint8_t  byte[4];
+	} token;
+
+	
+	printf("Reading [%s]\n", words_str);
+
+	int words = strtoul(words_str, &c, 0);
+
+	printf("Reading %d words\n", words);
+
+	for (int i = 0; i < words; i++) {
+		token.byte[0] = readchar();
+		token.byte[1] = readchar();
+		token.byte[2] = readchar();
+		token.byte[3] = readchar();
+		buf[i] = token.word;
+	}
+}
+
+static void rom_read(char *words_str)
+{
+	char *c;
+	uint32_t *buf = (unsigned int *) MAIN_RAM_BASE;
+
+	union {
+		uint32_t word;
+		uint8_t  byte[4];
+	} token;
+
+	int words = strtoul(words_str, &c, 0);
+
+	// xxd -p -c 16 < file.bin
+	for (int i = 0; i < words; i++) {
+		for (int j = 0; j < 4; j++) {
+			token.word = buf[i*4 + j];
+			printf("%02x%02x%02x%02x",
+				token.byte[0],
+				token.byte[1],
+				token.byte[2],
+				token.byte[3]
+			);
+		}
+		printf("\n");
+	}
+}
+
 /*-----------------------------------------------------------------------*/
 /* Console service / Main                                                */
 /*-----------------------------------------------------------------------*/
@@ -154,6 +259,18 @@ static void console_service(void)
 #endif
 	else if(strcmp(token, "cic") == 0)
 		main_cic();
+	else if(strcmp(token, "mem_read") == 0)
+		mem_read();
+	else if(strcmp(token, "mem_init") == 0)
+		mem_init();
+	else if(strcmp(token, "rom_load") == 0) {
+		char *words = get_token(&str);
+		rom_load(words);
+	}
+	else if(strcmp(token, "rom_read") == 0) {
+		char *words = get_token(&str);
+		rom_read(words);
+	}
 	prompt();
 }
 

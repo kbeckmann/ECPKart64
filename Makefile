@@ -26,6 +26,7 @@ app: $(BUILD_DIR)/software/app/app.bin
 
 $(BUILD_DIR)/software/app/app.bin:
 	$(V)$(MAKE) -C gateware/sw
+.PHONY: $(BUILD_DIR)/software/app/app.bin
 
 $(BUILD_DIR)/gateware/$(TARGET).bit: $(GATEWARE_SRC)
 	$(V)$(PYTHON3) -m gateware.ecpkart64.targets.$(TARGET) --build --csr-csv csr.csv --doc
@@ -40,10 +41,10 @@ load_app: app
 
 ### Debug tools
 lxterm: $(BUILD_DIR)/software/app/app.bin
-	$(LXTERM) $(UART_TTY) --kernel=$(BUILD_DIR)/software/app/app.bin
+	$(LXTERM) $(UART_TTY) --kernel=$(BUILD_DIR)/software/app/app.bin --kernel-adr=0x20000000 --speed 1000000
 
 litex_server:
-	$(LITEX_SERVER) --uart --uart-port /dev/ttyUSB0 --uart-baudrate 1000000
+	$(LITEX_SERVER) --uart --uart-port $(UARTBONE_TTY) --uart-baudrate 1000000
 
 litescope:
 	litescope_cli -v main_n64cartbus_state 2
@@ -56,4 +57,4 @@ clean:
 	$(V)$(ECHO) [ RM ] $(BUILD_DIR)
 	$(V)-rm -fR $(BUILD_DIR)
 
-.PHONY: all clean help load_bitstream load_app lxterm litex_server litescope dumper
+.PHONY: all clean help load_bitstream load_app app lxterm litex_server litescope dumper
