@@ -40,7 +40,7 @@ _io = [
         Subsignal("cke",        Pins("F20")),
         Subsignal("ba",         Pins("P19 N20")),
         Subsignal("dm",         Pins("T19 E20")),
-        IOStandard("LVCMOS33"), Misc("SLEWRATE=FAST")
+        IOStandard("LVCMOS33"), Misc("SLEWRATE=FAST"),
     ),
 
     # Probably won't use this one much
@@ -54,6 +54,7 @@ _io = [
         Subsignal("txe_n", Pins("J4")),
         Subsignal("rxf_n", Pins("J3")),
         Subsignal("oe_n",  Pins("H1")),
+        IOStandard("LVCMOS33"), Misc("SLEWRATE=FAST"),
     ),
 
     ("n64", 0,
@@ -65,6 +66,7 @@ _io = [
         Subsignal("read",       Pins("W:17")),
         Subsignal("write",      Pins("W:19")),
         Subsignal("nmi",        Pins("W:4")),
+        IOStandard("LVCMOS33"), Misc("SLEWRATE=FAST"),
     ),
 
     ("n64cic", 0,
@@ -72,9 +74,28 @@ _io = [
         Subsignal("cic_dio",  Pins("W:7")),
         Subsignal("cic_dclk", Pins("W:8")),
         Subsignal("eep_sdat", Pins("W:1")),
+        IOStandard("LVCMOS33"),
     )
 
 ]
+
+
+def sdcard_pmod_io(pmod="PMOD2"):
+    return [
+        # SDCard PMOD:
+        # - https://store.digilentinc.com/pmod-microsd-microsd-card-slot/
+        # - https://github.com/antmicro/arty-expansion-board
+        ("sdcard", 0,
+            Subsignal("data", Pins(f"{pmod}:3 {pmod}:7 {pmod}:8 {pmod}:1"), Misc("PULLMODE=UP")),
+            Subsignal("clk",  Pins(f"{pmod}:4")),
+            Subsignal("cmd",  Pins(f"{pmod}:2"), Misc("PULLMODE=UP")),
+            Subsignal("cd",   Pins(f"{pmod}:9")),
+            Misc("SLEWRATE=FAST"),
+            IOStandard("LVCMOS33"),
+        ),
+]
+
+_sdcard_pmod_io = sdcard_pmod_io()
 
 
 _connectors = [

@@ -51,8 +51,8 @@ class K4S561632J_UC75(SDRAMModule):
     # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=40, tRCD=40, tWR=40, tRFC=(None, 128), tFAW=None, tRAS=100)}
 
     technology_timings = _TechnologyTimings(tREFI=64e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
-    # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=20, tRCD=20, tWR=15, tRFC=(None, 66), tFAW=None, tRAS=44)}
-    speedgrade_timings = {"default": _SpeedgradeTimings(tRP=10, tRCD=10, tWR=10, tRFC=(None, 65), tFAW=None, tRAS=44)}
+    speedgrade_timings = {"default": _SpeedgradeTimings(tRP=20, tRCD=20, tWR=15, tRFC=(None, 66), tFAW=None, tRAS=44)}
+    # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=10, tRCD=10, tWR=10, tRFC=(None, 65), tFAW=None, tRAS=44)}
 
 
 # CRG ----------------------------------------------------------------------------------------------
@@ -149,6 +149,8 @@ class BaseSoC(SoCCore):
         #         pads         = leds[-2],
         #         sys_clk_freq = sys_clk_freq)
 
+        # N64 Peripheral Interface -----------------------------------------------------------------
+
         n64_pads = platform.request("n64")
 
         self.submodules.n64 = n64cart = N64Cart(
@@ -202,7 +204,7 @@ class BaseSoC(SoCCore):
             sdram_port.rdata.data,
         ]
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
-            depth        = 1024 * 6,
+            depth        = 1024 * 2,
             clock_domain = "sys",
             csr_csv      = "analyzer.csv")
 
@@ -237,6 +239,9 @@ def main():
         sys_clk_freq           = int(float(args.sys_clk_freq)),
         sdram_rate             = args.sdram_rate,
         **soc_core_argdict(args))
+
+    soc.platform.add_extension(kilsyth._sdcard_pmod_io)
+    soc.add_sdcard()
 
     builder = Builder(soc, **builder_argdict(args))
     builder_kargs = trellis_argdict(args) if args.toolchain == "trellis" else {}
