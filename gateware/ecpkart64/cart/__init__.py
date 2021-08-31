@@ -131,10 +131,27 @@ class N64CartBus(Module):
             sdram_port.cmd.last.eq(1),
             sdram_port.rdata.ready.eq(1),
             sdram_port.flush.eq(0),
-            sdram_data.eq(Mux(n64_addr[1],
-                Cat(sdram_port.rdata.data[24:32], sdram_port.rdata.data[16:24]),
-                Cat(sdram_port.rdata.data[ 8:16], sdram_port.rdata.data[ 0: 8])
-            )),
+            If(n64_addr[2:27] == 0,
+                # Configure the bus to run at a slower speed *for now*
+                # 50 MHz = 20ns
+                #
+                # Worst stall seems to be 17 cycles
+                #
+                # 0x1240 => 15 * 20 =  300 ns - Broken
+                # 0x2040 => 26 * 20 =  520 ns - Broken
+                # 0x2840 => ?? * 20 = ???? ns - TODO
+                # 0x3040 => 80 * 20 = 1600 ns - Working
+                # 0x4040 => ?? * 20 = ???? ns - Working
+                sdram_data.eq(Mux(n64_addr[1],
+                    0x3040,
+                    0x8037,
+                )),
+            ).Else(
+                sdram_data.eq(Mux(n64_addr[1],
+                    Cat(sdram_port.rdata.data[24:32], sdram_port.rdata.data[16:24]),
+                    Cat(sdram_port.rdata.data[ 8:16], sdram_port.rdata.data[ 0: 8])
+                )),
+            ),
         ]
         self.sync += If(sdram_port.rdata.valid, sdram_data_r.eq(sdram_data))
 
