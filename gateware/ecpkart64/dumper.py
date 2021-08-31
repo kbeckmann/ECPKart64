@@ -30,7 +30,7 @@ def main():
     log_entries = bus.regs.n64_logger_idx.read()
     print(f"Log entries: {log_entries + 1}")
 
-    base = bus.mems.n64.base
+    base = bus.mems.n64slave.base
 
     try:
         for addr in range(base, base + log_entries * 4, 4):
