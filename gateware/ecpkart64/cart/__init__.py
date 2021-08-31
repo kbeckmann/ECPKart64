@@ -146,9 +146,9 @@ class N64CartBus(Module):
 
         self.read_active = n64_read_active = Signal()
 
-        # counter = Signal(32)
-        # self.comb += logger_wr.dat_w.eq(counter)
-        self.comb += logger_wr.dat_w.eq(n64_addr)
+        counter = Signal(32)
+        self.sync += logger_wr.dat_w.eq(counter)
+        # self.comb += logger_wr.dat_w.eq(n64_addr)
         self.sync += If(logger_wr.we, logger_wr.we.eq(0))
 
         self.fsm = fsm = FSM(reset_state="INIT")
@@ -228,11 +228,11 @@ class N64CartBus(Module):
 
             If(~n64_read,
                 # *Always* add a log entry in the logger even if the req. is not for us
-                If(logger_wr.adr < logger_words - 1,
-                    # NextValue(counter, counter + 1),
-                    NextValue(logger_wr.we, 1),
-                    NextValue(logger_wr.adr, logger_wr.adr + 1),
-                ),
+                # If(logger_wr.adr < logger_words - 1,
+                #     # NextValue(counter, counter + 1),
+                #     NextValue(logger_wr.we, 1),
+                #     NextValue(logger_wr.adr, logger_wr.adr + 1),
+                # ),
                 # Uncomment to loop the log
                 # .Else(
                 #     NextValue(logger_wr.we, 1),
@@ -243,9 +243,17 @@ class N64CartBus(Module):
                 If(~n64_read & roms_cs,
                     # Perform read request on the wishbone bus
                     sdram_port.cmd.valid.eq(1),
+                    NextValue(counter, counter + 1),
 
                     # Go to next state when we get the ack
                     If(sdram_port.cmd.ready & sdram_port.rdata.valid,
+                        # Log number of cycles it took to access data
+                        NextValue(counter, 0),
+                        If(counter > 14, # Longer than this is game over
+                            NextValue(logger_wr.we, 1),
+                            NextValue(logger_wr.adr, logger_wr.adr + 1),
+                        ),
+
                         NextValue(n64_read_active, 1),
                         NextState("WAIT_READ_H"),
                     ),
