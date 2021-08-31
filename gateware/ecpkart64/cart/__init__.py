@@ -135,7 +135,7 @@ class N64CartBus(Module):
                 # Configure the bus to run at a slower speed *for now*
                 # 50 MHz = 20ns
                 #
-                # Worst stall seems to be 17 cycles
+                # Worst stall seems to be 23 cycles
                 #
                 # 0x1240 => 15 * 20 =  300 ns - Broken
                 # 0x2040 => 26 * 20 =  520 ns - Broken
