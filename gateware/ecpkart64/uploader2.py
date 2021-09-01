@@ -7,10 +7,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import os
-import sys
 import argparse
-
-import time
 
 from struct import unpack
 from litex import RemoteClient
@@ -36,29 +33,16 @@ def main():
     if not os.path.exists(args.file):
         raise ValueError("{} not found.".format(args.csr_csv))
 
-    
-
     bus = RemoteClient(csr_csv=args.csr_csv, debug=True)
     base = bus.mems.main_ram.base
-    print(f"{base:X}")
-    # exit()
 
     port = serial.serial_for_url(args.port, args.baudrate)
-    # port.open()
 
     try:
         with open(args.file, "rb") as f:
             data_bytes = f.read()
-            port.write(bytes(f"\n\nrom_load {len(data_bytes)//4}\n".encode("utf-8")))
-
+            port.write(bytes(f"\n\nmem_load {base} {len(data_bytes)}\n".encode("utf-8")))
             port.write(data_bytes)
-            # for i in range(0, len(data_bytes)):
-                # port.write(data_bytes[i])
-                # port.write(bytes(data_bytes[1]))
-                # port.write("A".encode("utf-8"))
-                # port.write(bytearray(data_bytes[i]))
-                # print(data_bytes[1])
-
             f.close()
 
     finally:

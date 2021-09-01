@@ -11,6 +11,7 @@
 #include <generated/csr.h>
 #include <generated/mem.h>
 
+#include "sha256.h"
 #include "cic.h"
 
 /*-----------------------------------------------------------------------*/
@@ -73,7 +74,7 @@ static char *get_token(char **str)
 
 static void prompt(void)
 {
-	printf("\e[92;1mlitex-demo-app\e[0m> ");
+	printf("\e[92;1mecpkart64-app\e[0m> ");
 }
 
 /*-----------------------------------------------------------------------*/
@@ -82,14 +83,18 @@ static void prompt(void)
 
 static void help(void)
 {
-	puts("\nLiteX minimal demo app built "__DATE__" "__TIME__"\n");
+	puts("\nECPKart64 app built "__DATE__" "__TIME__"\n");
 	puts("Available commands:");
 	puts("help               - Show this command");
 	puts("reboot             - Reboot CPU");
-#ifdef CSR_LEDS_BASE
-	puts("led                - Led demo");
-#endif
 	puts("cic                - Start CIC emulation");
+	puts("");
+	puts("mem_read           - Read memory: <address> <length>");
+	puts("mem_write          - Write memory: <address> <bytes> <value>");
+	puts("mem_load           - Load raw bytes [32b]: <address> <length>");
+	puts("mem_dump           - Hexdump [32b]: <address> <length>");
+	puts("sha256             - Calculate SHA256 hash of memory: <address> <length>");
+	puts("");
 }
 
 /*-----------------------------------------------------------------------*/
@@ -101,40 +106,8 @@ static void reboot_cmd(void)
 	ctrl_reset_write(1);
 }
 
-#ifdef CSR_LEDS_BASE
-static void led_cmd(void)
-{
-	int i;
-	printf("Led demo...\n");
-
-	printf("Counter mode...\n");
-	for(i=0; i<32; i++) {
-		leds_out_write(i);
-		busy_wait(100);
-	}
-
-	printf("Shift mode...\n");
-	for(i=0; i<4; i++) {
-		leds_out_write(1<<i);
-		busy_wait(200);
-	}
-	for(i=0; i<4; i++) {
-		leds_out_write(1<<(3-i));
-		busy_wait(200);
-	}
-
-	printf("Dance mode...\n");
-	for(i=0; i<4; i++) {
-		leds_out_write(0x55);
-		busy_wait(200);
-		leds_out_write(0xaa);
-		busy_wait(200);
-	}
-}
-#endif
-
 #define NUMBER_OF_BYTES_ON_A_LINE 16
-void dump_bytes(unsigned int *ptr, int count, unsigned long addr)
+static void dump_bytes(unsigned int *ptr, int count, unsigned long addr)
 {
 	char *data = (char *)ptr;
 	int line_bytes = 0, i = 0;
@@ -171,70 +144,90 @@ void dump_bytes(unsigned int *ptr, int count, unsigned long addr)
 	printf("\n");
 }
 
-static void mem_read(void)
+static void mem_read(char *address_str, char *len_str)
 {
-	dump_bytes((unsigned int *) MAIN_RAM_BASE, 0x200, MAIN_RAM_BASE);
+	char *c;
+	uint32_t *address = (uint32_t *) strtoul(address_str, &c, 0);
+	uint32_t len = strtoul(len_str, &c, 0);
+
+	dump_bytes(address, len, (uint32_t) address);
 }
 
-static void mem_init(void)
+static void mem_write(char *address_str, char *len_str, char *value_str)
 {
-	uint32_t *buf = (unsigned int *) MAIN_RAM_BASE;
-	for (uint32_t i = 0; i < 256; i++) {
-		buf[i] = i;
+	char *c;
+	uint32_t *address = (uint32_t *) strtoul(address_str, &c, 0);
+	uint32_t len = (strtoul(len_str, &c, 0) + 3) / 4;
+	uint32_t value = strtoul(value_str, &c, 0);
+
+	for (uint32_t i = 0; i < len; i++) {
+		address[i] = value;
 	}
 }
 
-static void rom_load(char *words_str)
+static void mem_load(char *address_str, char *len_str)
 {
 	char *c;
-	uint32_t *buf = (unsigned int *) MAIN_RAM_BASE;
+	uint32_t *address = (uint32_t *) strtoul(address_str, &c, 0);
+	uint32_t words = (strtoul(len_str, &c, 0) + 3) / 4;
 
 	union {
 		uint32_t word;
 		uint8_t  byte[4];
-	} token;
-
-	
-	printf("Reading [%s]\n", words_str);
-
-	int words = strtoul(words_str, &c, 0);
+	} value;
 
 	printf("Reading %d words\n", words);
 
 	for (int i = 0; i < words; i++) {
-		token.byte[0] = readchar();
-		token.byte[1] = readchar();
-		token.byte[2] = readchar();
-		token.byte[3] = readchar();
-		buf[i] = token.word;
+		value.byte[0] = readchar();
+		value.byte[1] = readchar();
+		value.byte[2] = readchar();
+		value.byte[3] = readchar();
+		address[i] = value.word;
 	}
 }
 
-static void rom_read(char *words_str)
+static void mem_dump(char *address_str, char *len_str)
 {
 	char *c;
-	uint32_t *buf = (unsigned int *) MAIN_RAM_BASE;
-
 	union {
 		uint32_t word;
 		uint8_t  byte[4];
-	} token;
+	} value;
 
-	int words = strtoul(words_str, &c, 0);
+	uint32_t *address = (uint32_t *) strtoul(address_str, &c, 0);
+	uint32_t len = strtoul(len_str, &c, 0);
+	uint32_t written = 0;
 
-	// xxd -p -c 16 < file.bin
-	for (int i = 0; i < words; i++) {
+	// xxd -p -c 16 < file.hex > file.bin
+	for (int i = 0; i < (len + 15) / 16; i++) {
 		for (int j = 0; j < 4; j++) {
-			token.word = buf[i*4 + j];
+			value.word = address[i * 4 + j];
 			printf("%02x%02x%02x%02x",
-				token.byte[0],
-				token.byte[1],
-				token.byte[2],
-				token.byte[3]
+				value.byte[0],
+				value.byte[1],
+				value.byte[2],
+				value.byte[3]
 			);
+			written += 4;
+			if (written >= len) {
+				printf("\n");
+				break;
+			}
 		}
 		printf("\n");
 	}
+}
+
+static void sha256(char *address_str, char *len_str)
+{
+	char *c;
+	BYTE *address = (BYTE *) strtoul(address_str, &c, 0);
+	uint32_t len = strtoul(len_str, &c, 0);
+	BYTE hash_str[65];
+
+	sha256_to_string(hash_str, address, len);
+	puts((char *) hash_str);
 }
 
 /*-----------------------------------------------------------------------*/
@@ -259,17 +252,31 @@ static void console_service(void)
 #endif
 	else if(strcmp(token, "cic") == 0)
 		main_cic();
-	else if(strcmp(token, "mem_read") == 0)
-		mem_read();
-	else if(strcmp(token, "mem_init") == 0)
-		mem_init();
-	else if(strcmp(token, "rom_load") == 0) {
-		char *words = get_token(&str);
-		rom_load(words);
+	else if(strcmp(token, "mem_read") == 0) {
+		char *addr = get_token(&str);
+		char *len = get_token(&str);
+		mem_read(addr, len);
 	}
-	else if(strcmp(token, "rom_read") == 0) {
-		char *words = get_token(&str);
-		rom_read(words);
+	else if(strcmp(token, "mem_write") == 0) {
+		char *addr = get_token(&str);
+		char *len = get_token(&str);
+		char *value = get_token(&str);
+		mem_write(addr, len, value);
+	}
+	else if(strcmp(token, "mem_load") == 0) {
+		char *addr = get_token(&str);
+		char *len = get_token(&str);
+		mem_load(addr, len);
+	}
+	else if(strcmp(token, "mem_dump") == 0) {
+		char *addr = get_token(&str);
+		char *len = get_token(&str);
+		mem_dump(addr, len);
+	}
+	else if(strcmp(token, "sha256") == 0) {
+		char *addr = get_token(&str);
+		char *len = get_token(&str);
+		sha256(addr, len);
 	}
 	prompt();
 }

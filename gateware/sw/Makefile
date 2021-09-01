@@ -20,9 +20,10 @@ endif
 
 
 C_SOURCES =  \
+	cic.c \
 	isr.c \
 	main.c \
-	cic.c \
+	sha256.c \
 
 OBJECTS = $(addprefix $(APP_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
 
