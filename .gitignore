@@ -91,3 +91,11 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+
+*.csv
+*.vcd
+*.gtkw
+*.txt
+*.hex
+*.z64
