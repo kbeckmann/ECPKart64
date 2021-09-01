@@ -135,15 +135,17 @@ class N64CartBus(Module):
                 # Configure the bus to run at a slower speed *for now*
                 # 50 MHz = 20ns
                 #
-                # Worst stall seems to be 23 cycles
+                # SDRAM Worst stall seems to be 24 cycles.
+                # 
+                # Read strobe length = 16.25ns * value (high nibble)
                 #
                 # 0x1240 => 15 * 20 =  300 ns - Broken
                 # 0x2040 => 26 * 20 =  520 ns - Broken
-                # 0x2840 => ?? * 20 = ???? ns - TODO
-                # 0x3040 => 80 * 20 = 1600 ns - Working
-                # 0x4040 => ?? * 20 = ???? ns - Working
+                # 0x2840 => 32 * 20 =  650 ns - ???
+                # 0x3040 => 39 * 20 =  780 ns - Working *most of the time*
+                # 0x4040 => 52 * 20 = 1040 ns - Working stable.
                 sdram_data.eq(Mux(n64_addr[1],
-                    0x3040,
+                    0x4040,
                     0x8037,
                 )),
             ).Else(
@@ -266,7 +268,7 @@ class N64CartBus(Module):
                     If(sdram_port.cmd.ready & sdram_port.rdata.valid,
                         # Log number of cycles it took to access data
                         NextValue(counter, 0),
-                        If(counter > 14, # Longer than this is game over
+                        If(counter > 23, # Longer than 14 cycles (280ns) is game over with 0x1240 config
                             NextValue(logger_wr.we, 1),
                             NextValue(logger_wr.adr, logger_wr.adr + 1),
                         ),
