@@ -8,6 +8,8 @@ ECHO         ?= echo
 
 UARTBONE_TTY ?= /dev/ttyUSB0
 UART_TTY     ?= /dev/ttyUSB1
+UART_BAUD    ?= 1000000
+
 
 # To enable verbose, append VERBOSE=1 to make, e.g.:
 # make VERBOSE=1
@@ -41,10 +43,10 @@ load_app: app
 
 ### Debug tools
 lxterm: $(BUILD_DIR)/software/app/app.bin
-	$(LXTERM) $(UART_TTY) --kernel=$(BUILD_DIR)/software/app/app.bin --kernel-adr=0x20000000 --speed 1000000
+	$(LXTERM) $(UART_TTY) --kernel=$(BUILD_DIR)/software/app/app.bin --kernel-adr=0x20000000 --speed $(UART_BAUD)
 
 litex_server:
-	$(LITEX_SERVER) --uart --uart-port $(UARTBONE_TTY) --uart-baudrate 1000000
+	$(LITEX_SERVER) --uart --uart-port $(UARTBONE_TTY) --uart-baudrate $(UART_BAUD)
 
 litescope:
 	litescope_cli -v main_n64cartbus_state 2
