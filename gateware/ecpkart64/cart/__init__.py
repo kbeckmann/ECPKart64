@@ -21,6 +21,7 @@ class N64Cart(Module, AutoCSR):
         self.pads = pads
 
         self.logger_idx = CSRStatus(32, description="Logger index")
+        self.rom_header = CSRStorage(32, description="ROM Header (first word)")
 
         # Logging wishbone memory area
         logger_words = 4096
@@ -46,11 +47,11 @@ class N64Cart(Module, AutoCSR):
             wb_slave.dat_r.eq(logger_rd.dat_r)
         ]
 
-        self.submodules.n64cartbus = n64cartbus = N64CartBus(pads, sdram_port, logger_wr, logger_words, leds)
+        self.submodules.n64cartbus = N64CartBus(pads, sdram_port, logger_wr, logger_words, leds, self.rom_header)
 
 
 class N64CartBus(Module):
-    def __init__(self, pads, sdram_port, logger_wr, logger_words, leds):
+    def __init__(self, pads, sdram_port, logger_wr, logger_words, leds, rom_header_csr):
         self.pads = pads
 
         self.cold_reset = n64_cold_reset = Signal()
@@ -131,7 +132,7 @@ class N64CartBus(Module):
             sdram_port.cmd.last.eq(1),
             sdram_port.rdata.ready.eq(1),
             sdram_port.flush.eq(0),
-            If(n64_addr[2:27] == 0,
+            If((n64_addr[2:27] == 0) & (rom_header_csr.storage != 0),
                 # Configure the bus to run at a slower speed *for now*
                 # 50 MHz = 20ns
                 #
@@ -145,13 +146,13 @@ class N64CartBus(Module):
                 # 0x3040 => 39 * 20 =  780 ns - Working *most of the time*
                 # 0x4040 => 52 * 20 = 1040 ns - Working stable.
                 sdram_data.eq(Mux(n64_addr[1],
-                    0x4040,
-                    0x8037,
+                    Cat(rom_header_csr.storage[ 0: 8], rom_header_csr.storage[ 8:16]),
+                    Cat(rom_header_csr.storage[16:24], rom_header_csr.storage[24:32]),
                 )),
             ).Else(
                 sdram_data.eq(Mux(n64_addr[1],
                     Cat(sdram_port.rdata.data[24:32], sdram_port.rdata.data[16:24]),
-                    Cat(sdram_port.rdata.data[ 8:16], sdram_port.rdata.data[ 0: 8])
+                    Cat(sdram_port.rdata.data[ 8:16], sdram_port.rdata.data[ 0: 8]),
                 )),
             ),
         ]

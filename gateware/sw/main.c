@@ -94,6 +94,7 @@ static void help(void)
 	puts("mem_load           - Load raw bytes [32b]: <address> <length>");
 	puts("mem_dump           - Hexdump [32b]: <address> <length>");
 	puts("sha256             - Calculate SHA256 hash of memory: <address> <length>");
+	puts("set_header         - Overrides the first word of the rom: <value>");
 	puts("");
 }
 
@@ -230,6 +231,13 @@ static void sha256(char *address_str, char *len_str)
 	puts((char *) hash_str);
 }
 
+static void set_header(char *value_str)
+{
+	char *c;
+	uint32_t value = strtoul(value_str, &c, 0);
+	n64_rom_header_write(value);
+}
+
 /*-----------------------------------------------------------------------*/
 /* Console service / Main                                                */
 /*-----------------------------------------------------------------------*/
@@ -277,6 +285,10 @@ static void console_service(void)
 		char *addr = get_token(&str);
 		char *len = get_token(&str);
 		sha256(addr, len);
+	}
+	else if(strcmp(token, "set_header") == 0) {
+		char *value = get_token(&str);
+		set_header(value);
 	}
 	prompt();
 }

@@ -19,6 +19,7 @@ def parse_args():
     parser.add_argument("--file", default="bootrom.z64", help="z64 ROM file")
     parser.add_argument("--port", default="/dev/ttyUSB1", help="port")
     parser.add_argument("--baudrate", default="1000000", help="baud")
+    parser.add_argument("--header", type=lambda x: int(x, 0), default=0x80374040, help="Override the first word of the ROM")
     args = parser.parse_args()
     return args
 
@@ -41,8 +42,9 @@ def main():
     try:
         with open(args.file, "rb") as f:
             data_bytes = f.read()
-            port.write(bytes(f"\n\nmem_load {base} {len(data_bytes)}\n".encode("utf-8")))
+            port.write(bytes(f"\n\nmem_load {hex(base)} {len(data_bytes)}\n".encode("utf-8")))
             port.write(data_bytes)
+            port.write(bytes(f"set_header {hex(args.header)}\n".encode("utf-8")))
             f.close()
 
     finally:
