@@ -29,6 +29,7 @@ DEPFLAGS += -MD -MP
 INCLUDES =  -I$(SOC_DIRECTORY)/software/include/base \
 			-I$(SOC_DIRECTORY)/software/include \
 			-I$(SOC_DIRECTORY)/software \
+			-I$(LIBLITESDCARD_DIRECTORY) \
 			-I$(BUILDINC_DIRECTORY) \
 			-I$(CPU_DIRECTORY)
 
