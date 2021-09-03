@@ -79,6 +79,17 @@ _io = [
 
 ]
 
+def usb_pmod_io(pmod="PMOD1"):
+    return [
+        ("usb", 0,
+            Subsignal("d_p",    Pins(f"{pmod}:1")),
+            Subsignal("d_n",    Pins(f"{pmod}:2")),
+            Subsignal("pullup", Pins(f"{pmod}:3")),
+            IOStandard("LVCMOS33"),
+        )
+]
+
+_usb_pmod_io = usb_pmod_io()
 
 def sdcard_pmod_io(pmod="PMOD2"):
     return [
