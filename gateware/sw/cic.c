@@ -124,9 +124,20 @@ static int running = 1;
 
 static int check_running(void)
 {
+    if (!running) {
+        return running;
+    }
+
     if (readchar_nonblock()) {
         char c = readchar();
         printf("Bye! (%02X)\n", c);
+
+        // Stop the CIC
+        running = 0;
+    }
+
+    if (n64_cold_reset_in_read() == 0) {
+        printf("Reset detected!\n");
 
         // Stop the CIC
         running = 0;
@@ -266,10 +277,10 @@ void WriteChecksum(void)
 
     // wait for DCLK to go low
     // (doesn't seem to be necessary)
-    int vin;
-    do {
-        vin = n64cic_cic_dclk_in_read();
-    } while ((vin & 1) && check_running());
+    // int vin;
+    // do {
+    //     vin = n64cic_cic_dclk_in_read();
+    // } while ((vin & 1) && check_running());
 
     // "encrytion" key
     // initial value doesn't matter
@@ -518,9 +529,12 @@ void main_cic(void)
     n64cic_cic_dio_oe_write(0);
 
     printf("CIC: Wait for reset...\n");
-    // Wait for reset
-    while ((n64_cold_reset_in_read() == 0) && check_running()) {
-
+    // Wait for reset to be released
+    while ((n64_cold_reset_in_read() == 0)) {
+        if (readchar_nonblock()) {
+            readchar();
+            return;
+        }
     }
 
     // read the region setting
@@ -546,8 +560,6 @@ void main_cic(void)
     // read the initial values from the PIF
     _CicMem[0x01] = ReadNibble();
     _CicMem[0x11] = ReadNibble();
-
-    // printf("R: %02X %02X\n", _CicMem[0x01], _CicMem[0x11]);
 
     while(check_running())
     {
