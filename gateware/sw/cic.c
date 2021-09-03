@@ -5,37 +5,32 @@ This file is part of ECPKart64.
 Copyright (c) 2019 Jan Goldacker
 Copyright (c) 2021 Konrad Beckmann <konrad.beckmann@gmail.com>
 
-Forked from https://github.com/jago85/UltraCIC_C
+This is a port of:
+https://github.com/jago85/UltraCIC_C/blob/master/cic_c.c
 
 SPDX-License-Identifier: MIT License
 
+Generic CIC implementation for N64
+----------------------------------------------------------
+This should run on every MCU which is fast enough to
+handle the IO operations.
+You just have to implement the low level gpio functions:
+    - ReadBit() and
+    - WriteBit().
 
-/**************************************************************
- * Generic CIC implementation for N64                         *
- * ---------------------------------------------------------- *
- * This should run on every MCU which is fast enough to       *
- * handle the IO operations.                                  *
- * You just have to implement the low level gpio functions:   *
- *     - ReadBit() and                                        *
- *     - WriteBit().                                          *
- *                                                            *
- * Hardware connections                                       *
- * Data Clock Input (DCLK): CIC Pin 14                        *
- * Data Line, Bidir (DIO):  CIC Pin 15                        *
- *                                                            *
+Hardware connections
+Data Clock Input (DCLK): CIC Pin 14
+Data Line, Bidir (DIO):  CIC Pin 15
 
 
-
-
-
-This is a port of:
-https://github.com/jago85/UltraCIC_C/blob/master/cic_c.c
 
 */
 
 #include <stdio.h>
+#include <string.h>
 
 #include <generated/csr.h>
+#include <console.h>
 
 #include "cic.h"
 
@@ -46,7 +41,7 @@ https://github.com/jago85/UltraCIC_C/blob/master/cic_c.c
 
 #define GET_REGION() (REGION_PAL)
 
-/* SEEDs */ 
+/* SEEDs */
 
 // 6102/7101
 #define CIC6102_SEED 0x3F
@@ -86,9 +81,9 @@ https://github.com/jago85/UltraCIC_C/blob/master/cic_c.c
 // 7102
 #define CIC7102_CHECKSUM 0x4, 0x4, 0x1, 0x6, 0x0, 0xE, 0xC, 0x5, 0xD, 0x9, 0xA, 0xF
 
-void EncodeRound(unsigned char index);
-void CicRound(unsigned char *);
-void Cic6105Algo(void);
+static void EncodeRound(unsigned char index);
+static void CicRound(unsigned char *);
+static void Cic6105Algo(void);
 
 /* Select SEED and CHECKSUM here */
 const unsigned char _CicSeed = CIC6102_SEED;
@@ -121,6 +116,7 @@ unsigned char _6105Mem[32];
 /* YOU HAVE TO IMPLEMENT THE LOW LEVEL GPIO FUNCTIONS ReadBit() and WriteBit() */
 
 static int running = 1;
+static int exit_by_uart = 0;
 
 static int check_running(void)
 {
@@ -134,6 +130,7 @@ static int check_running(void)
 
         // Stop the CIC
         running = 0;
+        exit_by_uart = 1;
     }
 
     if (n64_cold_reset_in_read() == 0) {
@@ -146,7 +143,7 @@ static int check_running(void)
     return running;
 }
 
-unsigned char ReadBit(void)
+static unsigned char ReadBit(void)
 {
     unsigned char res;
 
@@ -168,22 +165,14 @@ unsigned char ReadBit(void)
     return res & 0x01;
 }
 
-void WriteBit(unsigned char b)
+static void WriteBit(unsigned char b)
 {
     unsigned char vin;
-    int i;
-
-    // DBG2("W: %d ", b);
 
     // wait for DCLK to go low
     do {
         vin = n64cic_cic_dclk_in_read();
     } while ((vin & 1) && check_running());
-
-    // Delay a bit to get a 90 degree phase shift (not needed)
-    // for (i = 0; i < 50; i++) {
-    //     n64cic_cic_dclk_in_read();
-    // }
 
     if (b == 0)
     {
@@ -197,17 +186,12 @@ void WriteBit(unsigned char b)
         vin = n64cic_cic_dclk_in_read();
     } while (((vin & 1) == 0) && check_running());
 
-    // // Delay a bit..
-    // for (i = 0; i < 50; i++) {
-    //     n64cic_cic_dclk_in_read();
-    // }
-
     // Disable output
     n64cic_cic_dio_oe_write(0);
 }
 
 /* Writes the lowes 4 bits of the byte */
-void WriteNibble(unsigned char n)
+static void WriteNibble(unsigned char n)
 {
     WriteBit(n & 0x08);
     WriteBit(n & 0x04);
@@ -216,7 +200,7 @@ void WriteNibble(unsigned char n)
 }
 
 // Write RAM nibbles until index hits a 16 Byte border
-void WriteRamNibbles(unsigned char index)
+static void WriteRamNibbles(unsigned char index)
 {
     do
     {
@@ -226,7 +210,7 @@ void WriteRamNibbles(unsigned char index)
 }
 
 /* Reads 4 bits and returns them in the lowes 4 bits of a byte */
-unsigned char ReadNibble(void)
+static unsigned char ReadNibble(void)
 {
     unsigned char res = 0;
     unsigned char i;
@@ -239,7 +223,7 @@ unsigned char ReadNibble(void)
 }
 
 /* Encrypt and output the seed */
-void WriteSeed(void)
+static void WriteSeed(void)
 {
     _CicMem[0x0a] = 0xb;
     _CicMem[0x0b] = 0x5;
@@ -269,7 +253,7 @@ void WriteSeed(void)
 }
 
 /* Encrypt and output the checksum */
-void WriteChecksum(void)
+static void WriteChecksum(void)
 {
     unsigned char i;
     for (i = 0; i < 12; i++)
@@ -316,7 +300,7 @@ void WriteChecksum(void)
 }
 
 /* seed and checksum encryption algorithm */
-void EncodeRound(unsigned char index)
+static void EncodeRound(unsigned char index)
 {
     unsigned char a;
 
@@ -333,7 +317,7 @@ void EncodeRound(unsigned char index)
 }
 
 /* Exchange value of a and b */
-void Exchange(unsigned char *a, unsigned char *b)
+static void Exchange(unsigned char *a, unsigned char *b)
 {
     unsigned char tmp;
     tmp = *a;
@@ -345,7 +329,7 @@ void Exchange(unsigned char *a, unsigned char *b)
 // this implementation saves program memory in LM8
 
 /* CIC compare mode memory alternation algorithm */
-void CicRound(unsigned char * m)
+static void CicRound(unsigned char * m)
 {
     unsigned char a;
     unsigned char b, x;
@@ -397,7 +381,7 @@ void CicRound(unsigned char * m)
 // Big Thx to Mike Ryan, John McMaster, marshallh for publishing their work
 
 /* CIC 6105 algorithm */
-void Cic6105Algo(void)
+static void Cic6105Algo(void)
 {
     unsigned char A = 5;
     unsigned char carry = 1;
@@ -429,7 +413,7 @@ void Cic6105Algo(void)
 }
 
 /* CIC compare mode */
-void CompareMode(unsigned char isPal)
+static void CompareMode(unsigned char isPal)
 {
     unsigned char ramPtr;
     // don't care about the low ram as we don't check this
@@ -473,7 +457,7 @@ void CompareMode(unsigned char isPal)
 }
 
 /* CIC 6105 mode */
-void Cic6105Mode(void)
+static void Cic6105Mode(void)
 {
     unsigned char ramPtr;
 
@@ -501,7 +485,7 @@ void Cic6105Mode(void)
 }
 
 /* Load initial ram depending on region */
-void InitRam(unsigned char isPal)
+static void InitRam(unsigned char isPal)
 {
     unsigned char i;
 
@@ -517,7 +501,7 @@ void InitRam(unsigned char isPal)
     }
 }
 
-void main_cic(void)
+static void cic_run(void)
 {
     unsigned char isPal;
 
@@ -525,17 +509,21 @@ void main_cic(void)
     memset(_CicMem, 0, sizeof(_CicMem));
     memset(_6105Mem, 0, sizeof(_6105Mem));
     running = 1;
+    exit_by_uart = 0;
 
     n64cic_cic_dio_oe_write(0);
 
     printf("CIC: Wait for reset...\n");
     // Wait for reset to be released
-    while ((n64_cold_reset_in_read() == 0)) {
+    while (n64_cold_reset_in_read() == 0) {
         if (readchar_nonblock()) {
             readchar();
+            exit_by_uart = 1;
             return;
         }
     }
+
+    printf("CIC: Start!\n");
 
     // read the region setting
     isPal = GET_REGION();
@@ -544,7 +532,7 @@ void main_cic(void)
     unsigned char hello = 0x1;
     if (isPal)
         hello |= 0x4;
-    
+
     // printf("W: %02X\n", hello);
     WriteNibble(hello);
 
@@ -553,10 +541,10 @@ void main_cic(void)
 
     // encode and send the checksum
     WriteChecksum();
-    
+
     // init the ram corresponding to the region
     InitRam(isPal);
-    
+
     // read the initial values from the PIF
     _CicMem[0x01] = ReadNibble();
     _CicMem[0x11] = ReadNibble();
@@ -593,4 +581,11 @@ void main_cic(void)
 
     n64cic_cic_dio_oe_write(0);
     printf("Killed\n");
+}
+
+void main_cic(void)
+{
+    do {
+        cic_run();
+    } while(exit_by_uart == 0);
 }

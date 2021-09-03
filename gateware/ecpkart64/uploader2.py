@@ -20,6 +20,7 @@ def parse_args():
     parser.add_argument("--port", default="/dev/ttyUSB1", help="port")
     parser.add_argument("--baudrate", default="1000000", help="baud")
     parser.add_argument("--header", type=lambda x: int(x, 0), default=0x80374040, help="Override the first word of the ROM")
+    parser.add_argument("--cic", action="store_true", help="Starts the CIC app after upload")
     args = parser.parse_args()
     return args
 
@@ -45,6 +46,8 @@ def main():
             port.write(bytes(f"\n\nmem_load {hex(base)} {len(data_bytes)}\n".encode("utf-8")))
             port.write(data_bytes)
             port.write(bytes(f"set_header {hex(args.header)}\n".encode("utf-8")))
+            if args.cic:
+                port.write(bytes(f"cic\n".encode("utf-8")))
             f.close()
 
     finally:
