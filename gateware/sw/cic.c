@@ -120,6 +120,21 @@ unsigned char _6105Mem[32];
 
 /* YOU HAVE TO IMPLEMENT THE LOW LEVEL GPIO FUNCTIONS ReadBit() and WriteBit() */
 
+static int running = 1;
+
+static int check_running(void)
+{
+    if (readchar_nonblock()) {
+        char c = readchar();
+        printf("Bye! (%02X)\n", c);
+
+        // Stop the CIC
+        running = 0;
+    }
+
+    return running;
+}
+
 unsigned char ReadBit(void)
 {
     unsigned char res;
@@ -129,7 +144,7 @@ unsigned char ReadBit(void)
     // wait for DCLK to go low
     do {
         vin = n64cic_cic_dclk_in_read();
-    } while (vin & 1);
+    } while ((vin & 1) && check_running());
 
     // Read the data bit
     res = n64cic_cic_dio_in_read();
@@ -137,7 +152,7 @@ unsigned char ReadBit(void)
     // wait for DCLK to go high
     do {
         vin = n64cic_cic_dclk_in_read();
-    } while ((vin & 1) == 0);
+    } while (((vin & 1) == 0) && check_running());
 
     return res & 0x01;
 }
@@ -152,7 +167,7 @@ void WriteBit(unsigned char b)
     // wait for DCLK to go low
     do {
         vin = n64cic_cic_dclk_in_read();
-    } while (vin & 1);
+    } while ((vin & 1) && check_running());
 
     // Delay a bit to get a 90 degree phase shift (not needed)
     // for (i = 0; i < 50; i++) {
@@ -169,7 +184,7 @@ void WriteBit(unsigned char b)
     // wait for DCLK to go high
     do {
         vin = n64cic_cic_dclk_in_read();
-    } while ((vin & 1) == 0);
+    } while (((vin & 1) == 0) && check_running());
 
     // // Delay a bit..
     // for (i = 0; i < 50; i++) {
@@ -254,7 +269,7 @@ void WriteChecksum(void)
     int vin;
     do {
         vin = n64cic_cic_dclk_in_read();
-    } while (vin & 1);
+    } while ((vin & 1) && check_running());
 
     // "encrytion" key
     // initial value doesn't matter
@@ -402,14 +417,6 @@ void Cic6105Algo(void)
     }
 }
 
-/* Wait for reset */
-void Die(void)
-{
-    // never return
-    while (1)
-    { }
-}
-
 /* CIC compare mode */
 void CompareMode(unsigned char isPal)
 {
@@ -503,15 +510,16 @@ void main_cic(void)
 {
     unsigned char isPal;
 
-    n64cic_cic_dio_oe_write(0);
+    // Reset the state
+    memset(_CicMem, 0, sizeof(_CicMem));
+    memset(_6105Mem, 0, sizeof(_6105Mem));
+    running = 1;
 
-    // for (int i = 0; i < 32; i++) {
-    //     printf("%02X ", _CicRamInitNtsc[i]);
-    // }
+    n64cic_cic_dio_oe_write(0);
 
     printf("CIC: Wait for reset...\n");
     // Wait for reset
-    while (n64_cold_reset_in_read() == 0) {
+    while ((n64_cold_reset_in_read() == 0) && check_running()) {
 
     }
 
@@ -541,14 +549,8 @@ void main_cic(void)
 
     // printf("R: %02X %02X\n", _CicMem[0x01], _CicMem[0x11]);
 
-    while(1)
+    while(check_running())
     {
-        // if(readchar_nonblock()) {
-        //     char c = readchar();
-        //     printf("Bye! (%02X)\n", c);
-        //     break;
-        // }
-
         // read mode (2 bit)
         unsigned char cmd = 0;
         cmd |= (ReadBit() << 1);
@@ -573,7 +575,10 @@ void main_cic(void)
         case 1:
             // 01 (die)
         default:
-            Die();
+            return;
         }
     }
+
+    n64cic_cic_dio_oe_write(0);
+    printf("Killed\n");
 }
