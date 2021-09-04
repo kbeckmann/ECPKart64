@@ -50,7 +50,7 @@ class K4S561632J_UC75(SDRAMModule):
     # technology_timings = _TechnologyTimings(tREFI=64e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
     # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=40, tRCD=40, tWR=40, tRFC=(None, 128), tFAW=None, tRAS=100)}
 
-    technology_timings = _TechnologyTimings(tREFI=48e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
+    technology_timings = _TechnologyTimings(tREFI=50e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
     speedgrade_timings = {"default": _SpeedgradeTimings(tRP=20, tRCD=20, tWR=15, tRFC=(None, 66), tFAW=None, tRAS=44)}
     # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=10, tRCD=10, tWR=10, tRFC=(None, 65), tFAW=None, tRAS=44)}
 
@@ -97,7 +97,7 @@ class _CRG(Module):
 class BaseSoC(SoCCore):
     mem_map = {**SoCCore.mem_map}
     def __init__(self, device="LFE5U-45F", revision="1.0", toolchain="trellis",
-        sys_clk_freq=int(48e6), sdram_rate="1:2",
+        sys_clk_freq=int(50e6), sdram_rate="1:2",
         with_led_chaser=True,
         **kwargs):
         platform = kilsyth.Platform(device=device, revision=revision, toolchain=toolchain)
@@ -137,7 +137,8 @@ class BaseSoC(SoCCore):
         #     user_port.address_width)
         # wishbone2native = LiteDRAMWishbone2Native(sdram_wb, user_port)
         # self.submodules += wishbone2native
-        sdram_port = self.sdram.crossbar.get_port(data_width=32)
+        # sdram_port = self.sdram.crossbar.get_port(data_width=32)
+        sdram_port = self.sdram.crossbar.get_port(data_width=16)
 
 
         # Leds -------------------------------------------------------------------------------------
@@ -232,8 +233,8 @@ def main():
     parser.add_argument("--toolchain",       default="trellis",     help="FPGA toolchain: trellis (default) or diamond")
     parser.add_argument("--device",          default="LFE5U-45F",   help="FPGA device: LFE5U-12F, LFE5U-25F, LFE5U-45F (default)  or LFE5U-85F")
     parser.add_argument("--revision",        default="1.0",         help="Board revision: 1.0 (default)")
-    parser.add_argument("--sys-clk-freq",    default=48e6,          help="System clock frequency  (default: 48MHz)")
-    parser.add_argument("--sdram-rate",      default="1:2",         help="SDRAM Rate: 1:1 Full Rate (default), 1:2 Half Rate")
+    parser.add_argument("--sys-clk-freq",    default=50e6,          help="System clock frequency  (default: 48MHz)")
+    parser.add_argument("--sdram-rate",      default="1:1",         help="SDRAM Rate: 1:1 Full Rate (default), 1:2 Half Rate")
     builder_args(parser)
     soc_core_args(parser)
     trellis_args(parser)

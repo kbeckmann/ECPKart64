@@ -137,7 +137,12 @@ class N64CartBus(Module):
         self.sdram_data_r = sdram_data_r = Signal(16)
 
         self.comb += [
-            sdram_port.cmd.addr.eq(n64_addr[2:27]),
+            # 16 bit
+            sdram_port.cmd.addr.eq(n64_addr[1:27]),
+
+            # 32 bit
+            # sdram_port.cmd.addr.eq(n64_addr[2:27]),
+
             sdram_port.cmd.we.eq(0),
             sdram_port.cmd.last.eq(1),
             sdram_port.rdata.ready.eq(1),
@@ -146,7 +151,7 @@ class N64CartBus(Module):
                 # Configure the bus to run at a slower speed *for now*
                 # 50 MHz = 20ns
                 #
-                # SDRAM Worst stall seems to be 12 cycles.
+                # SDRAM Worst stall seems to be 10 cycles.
                 # 
                 # Read strobe length = 16.25ns * value (high nibble)
                 #
@@ -160,10 +165,16 @@ class N64CartBus(Module):
                     Cat(rom_header_csr.storage[16:24], rom_header_csr.storage[24:32]),
                 )),
             ).Else(
-                sdram_data.eq(Mux(n64_addr[1],
-                    Cat(sdram_port.rdata.data[24:32], sdram_port.rdata.data[16:24]),
+                # 16 bit
+                sdram_data.eq(
                     Cat(sdram_port.rdata.data[ 8:16], sdram_port.rdata.data[ 0: 8]),
-                )),
+                ),
+
+                # 32 bit
+                # sdram_data.eq(Mux(n64_addr[1],
+                #     Cat(sdram_port.rdata.data[24:32], sdram_port.rdata.data[16:24]),
+                #     Cat(sdram_port.rdata.data[ 8:16], sdram_port.rdata.data[ 0: 8]),
+                # )),
             ),
         ]
         self.sync += If(sdram_port.rdata.valid, sdram_data_r.eq(sdram_data))
@@ -262,7 +273,9 @@ class N64CartBus(Module):
             sdram_wait.eq(0),
 
             If(n64_read_active,
-                n64_ad_out.eq(sdram_data_r),
+                # Save one cycle latency by using rdata.valid - when this signal is high,
+                # sdram_data contains valid data. (Later on, it will not, and we need to use our register)
+                n64_ad_out.eq(Mux(sdram_port.rdata.valid, sdram_data, sdram_data_r)),
                 n64_ad_oe.eq(1),
             ),
 
@@ -281,7 +294,7 @@ class N64CartBus(Module):
 
                 # Only accept read request if we should handle it
                 If(~n64_read & roms_cs,
-                    # Perform read request on the wishbone bus
+                    # Enable the read command
                     sdram_port.cmd.valid.eq(1),
                     NextValue(counter, counter + 1),
 
