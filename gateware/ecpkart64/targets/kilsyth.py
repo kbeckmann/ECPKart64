@@ -50,7 +50,7 @@ class K4S561632J_UC75(SDRAMModule):
     # technology_timings = _TechnologyTimings(tREFI=64e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
     # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=40, tRCD=40, tWR=40, tRFC=(None, 128), tFAW=None, tRAS=100)}
 
-    technology_timings = _TechnologyTimings(tREFI=64e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
+    technology_timings = _TechnologyTimings(tREFI=48e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
     speedgrade_timings = {"default": _SpeedgradeTimings(tRP=20, tRCD=20, tWR=15, tRFC=(None, 66), tFAW=None, tRAS=44)}
     # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=10, tRCD=10, tWR=10, tRFC=(None, 65), tFAW=None, tRAS=44)}
 
@@ -83,7 +83,7 @@ class _CRG(Module):
             pll.create_clkout(self.cd_sys2x_ps, 2 * sys_clk_freq, phase=180) # Idealy 90° but needs to be increased.
         else:
            pll.create_clkout(self.cd_sys_ps, sys_clk_freq, phase=90)
-        
+
         # 200 MHz clock
         # self.clock_domains.cd_sys4x = ClockDomain()
         # pll.create_clkout(self.cd_sys4x, 4 * sys_clk_freq)
@@ -97,7 +97,7 @@ class _CRG(Module):
 class BaseSoC(SoCCore):
     mem_map = {**SoCCore.mem_map}
     def __init__(self, device="LFE5U-45F", revision="1.0", toolchain="trellis",
-        sys_clk_freq=int(50e6), sdram_rate="1:2",
+        sys_clk_freq=int(48e6), sdram_rate="1:2",
         with_led_chaser=True,
         **kwargs):
         platform = kilsyth.Platform(device=device, revision=revision, toolchain=toolchain)
@@ -157,6 +157,7 @@ class BaseSoC(SoCCore):
                 pads         = n64_pads,
                 leds         = leds,
                 sdram_port   = sdram_port,
+                sdram_wait   = self.sdram.controller.refresher.timer.wait,
                 fast_cd      = "sys",
                 #fast_cd      = "sys4x",
         )
@@ -202,6 +203,12 @@ class BaseSoC(SoCCore):
             sdram_port.rdata.ready,
             sdram_port.rdata.valid,
             sdram_port.rdata.data,
+
+            self.sdram.controller.refresher.fsm.ongoing("IDLE"),
+            self.sdram.controller.refresher.fsm.ongoing("WAIT-BANK-MACHINES"),
+            self.sdram.controller.refresher.fsm.ongoing("DO-REFRESH"),
+            self.sdram.controller.refresher.timer.count,
+            self.sdram.controller.refresher.timer.wait,
         ]
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
             depth        = 1024 * 2,
@@ -225,7 +232,7 @@ def main():
     parser.add_argument("--toolchain",       default="trellis",     help="FPGA toolchain: trellis (default) or diamond")
     parser.add_argument("--device",          default="LFE5U-45F",   help="FPGA device: LFE5U-12F, LFE5U-25F, LFE5U-45F (default)  or LFE5U-85F")
     parser.add_argument("--revision",        default="1.0",         help="Board revision: 1.0 (default)")
-    parser.add_argument("--sys-clk-freq",    default=50e6,          help="System clock frequency  (default: 50MHz)")
+    parser.add_argument("--sys-clk-freq",    default=48e6,          help="System clock frequency  (default: 48MHz)")
     parser.add_argument("--sdram-rate",      default="1:2",         help="SDRAM Rate: 1:1 Full Rate (default), 1:2 Half Rate")
     builder_args(parser)
     soc_core_args(parser)

@@ -17,10 +17,11 @@ import os
 
 class N64Cart(Module, AutoCSR):
 
-    def __init__(self, pads, leds, sdram_port, fast_cd="sys2x"):
+    def __init__(self, pads, leds, sdram_port, sdram_wait, fast_cd="sys2x"):
         self.pads = pads
 
         self.logger_idx = CSRStatus(32, description="Logger index")
+        self.logger_threshold = CSRStorage(32, reset=6, description="Logger threshold")
         self.rom_header = CSRStorage(32, description="ROM Header (first word)")
 
         # Logging wishbone memory area
@@ -47,11 +48,20 @@ class N64Cart(Module, AutoCSR):
             wb_slave.dat_r.eq(logger_rd.dat_r)
         ]
 
-        self.submodules.n64cartbus = N64CartBus(pads, sdram_port, logger_wr, logger_words, leds, self.rom_header)
+        self.submodules.n64cartbus = N64CartBus(
+            pads,
+            sdram_port,
+            sdram_wait,
+            logger_wr,
+            logger_words,
+            self.logger_threshold.storage,
+            leds,
+            self.rom_header
+        )
 
 
 class N64CartBus(Module):
-    def __init__(self, pads, sdram_port, logger_wr, logger_words, leds, rom_header_csr):
+    def __init__(self, pads, sdram_port, sdram_wait, logger_wr, logger_words, logger_threshold, leds, rom_header_csr):
         self.pads = pads
 
         self.cold_reset = n64_cold_reset = Signal()
@@ -136,7 +146,7 @@ class N64CartBus(Module):
                 # Configure the bus to run at a slower speed *for now*
                 # 50 MHz = 20ns
                 #
-                # SDRAM Worst stall seems to be 24 cycles.
+                # SDRAM Worst stall seems to be 12 cycles.
                 # 
                 # Read strobe length = 16.25ns * value (high nibble)
                 #
@@ -185,6 +195,8 @@ class N64CartBus(Module):
             NextValue(n64_addr, 0),
             NextValue(n64_read_active, 0),
 
+            sdram_wait.eq(1),
+
             # Active low. If high, start.
             If(n64_cold_reset, NextState("START"))
         )
@@ -194,6 +206,8 @@ class N64CartBus(Module):
             state.eq(1),
 
             NextValue(led_state, led_state | 0b0010),
+
+            sdram_wait.eq(1),
 
             If(n64_alel & n64_aleh,
                 # High part
@@ -208,6 +222,8 @@ class N64CartBus(Module):
             state.eq(2),
             NextValue(led_state, led_state | 0b0100),
 
+            sdram_wait.eq(0),
+
             If(n64_alel & ~n64_aleh,
                 # Store high part
                 NextValue(n64_addr_h, n64_ad_in_r),
@@ -221,6 +237,8 @@ class N64CartBus(Module):
         fsm.act("WAIT_ADDR_L",
             state.eq(3),
             NextValue(led_state, led_state | 0b0100),
+
+            sdram_wait.eq(0),
 
             If(~n64_alel & ~n64_aleh,
                 # Store low part
@@ -240,6 +258,8 @@ class N64CartBus(Module):
             state.eq(4),
             NextValue(led_state, led_state | 0b1000),
             # While in this state, we are processing the read request.
+
+            sdram_wait.eq(0),
 
             If(n64_read_active,
                 n64_ad_out.eq(sdram_data_r),
@@ -269,7 +289,7 @@ class N64CartBus(Module):
                     If(sdram_port.cmd.ready & sdram_port.rdata.valid,
                         # Log number of cycles it took to access data
                         NextValue(counter, 0),
-                        If(counter > 23, # Longer than 14 cycles (280ns) is game over with 0x1240 config
+                        If(counter > logger_threshold, # Longer than 14 cycles (280ns) is game over with 0x1240 config
                             NextValue(logger_wr.we, 1),
                             NextValue(logger_wr.adr, logger_wr.adr + 1),
                         ),
@@ -292,6 +312,8 @@ class N64CartBus(Module):
             state.eq(5),
             NextValue(led_state, led_state | 0b1000),
             # The data was latched in the previous state. OE = 1 now
+
+            sdram_wait.eq(0),
 
             n64_ad_out.eq(sdram_data_r),
             n64_ad_oe.eq(1),
