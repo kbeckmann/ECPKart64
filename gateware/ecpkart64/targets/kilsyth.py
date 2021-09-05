@@ -156,7 +156,6 @@ class BaseSoC(SoCCore):
 
         self.submodules.n64 = n64cart = N64Cart(
                 pads         = n64_pads,
-                leds         = leds,
                 sdram_port   = sdram_port,
                 sdram_wait   = self.sdram.controller.refresher.timer.wait,
                 fast_cd      = "sys",
@@ -164,6 +163,8 @@ class BaseSoC(SoCCore):
         )
         self.bus.add_slave("n64slave", self.n64.wb_slave, region=SoCRegion(origin=0x30000000, size=0x10000))
 
+        # Show N64cartbus state on the status leds
+        self.comb += leds.eq(1 << n64cart.n64cartbus.fsm.state)
 
         n64cic = self.platform.request("n64cic")
         self.submodules.n64cic_si_clk   = GPIOIn(n64cic.si_clk)

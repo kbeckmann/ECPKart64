@@ -17,7 +17,7 @@ import os
 
 class N64Cart(Module, AutoCSR):
 
-    def __init__(self, pads, leds, sdram_port, sdram_wait, fast_cd="sys2x"):
+    def __init__(self, pads, sdram_port, sdram_wait, fast_cd="sys2x"):
         self.pads = pads
 
         self.logger_idx = CSRStatus(32, description="Logger index")
@@ -55,13 +55,12 @@ class N64Cart(Module, AutoCSR):
             logger_wr,
             logger_words,
             self.logger_threshold.storage,
-            leds,
             self.rom_header
         )
 
 
 class N64CartBus(Module):
-    def __init__(self, pads, sdram_port, sdram_wait, logger_wr, logger_words, logger_threshold, leds, rom_header_csr):
+    def __init__(self, pads, sdram_port, sdram_wait, logger_wr, logger_words, logger_threshold, rom_header_csr):
         self.pads = pads
 
         self.cold_reset = n64_cold_reset = Signal()
@@ -118,17 +117,17 @@ class N64CartBus(Module):
         n64_addr_l = Signal(16)
         n64_addr_h = Signal(16)
         self.n64_addr = n64_addr = Signal(32)
-        roms_cs = Signal()
+        sdram_sel = Signal()
 
         # 0x10000000	0x1FBFFFFF	Cartridge Domain 1 Address 2	Cartridge ROM
         # self.comb += If(n64_addr[27:] == 0b00001, # 0x10000000
         #                 rom_port.adr.eq(n64_addr[1:]),
-        #                 roms_cs.eq(1),
+        #                 sdram_sel.eq(1),
         #              )
 
         self.comb += If((n64_addr >= 0x1000_0000) & (n64_addr < 0x1FC0_0000),
                         rom_port.adr.eq(n64_addr[1:24]),
-                        roms_cs.eq(1),
+                        sdram_sel.eq(1),
                      )
 
         # SDRAM direct port
@@ -179,12 +178,6 @@ class N64CartBus(Module):
         ]
         self.sync += If(sdram_port.rdata.valid, sdram_data_r.eq(sdram_data))
 
-
-
-        led_state = Signal(4)
-        # self.comb += leds.eq(Cat(led_state, n64_read, n64_write, n64_aleh, n64_alel))
-        self.comb += leds.eq(Cat(led_state, n64_read, n64_nmi, n64_aleh, n64_alel))
-
         self.read_active = n64_read_active = Signal()
 
         counter = Signal(32)
@@ -195,81 +188,64 @@ class N64CartBus(Module):
         self.fsm = fsm = FSM(reset_state="INIT")
         self.submodules += fsm
 
-        self.state = state = Signal(4)
-
-        # Wait for reset to be released
+        # Wait for reset to be released.
         fsm.act("INIT",
-            state.eq(0),
-            NextValue(led_state, 0b0001),
+            sdram_wait.eq(1),
 
             # Reset values
             NextValue(n64_addr, 0),
             NextValue(n64_read_active, 0),
 
-            sdram_wait.eq(1),
-
-            # Active low. If high, start.
+            # Active low. Go to START if high.
             If(n64_cold_reset, NextState("START"))
         )
 
-        # Sample the address
+        # Wait for /ALEL and /ALEH to both go high. This starts a bus access.
         fsm.act("START",
-            state.eq(1),
-
-            NextValue(led_state, led_state | 0b0010),
-
             sdram_wait.eq(1),
 
             If(n64_alel & n64_aleh,
-                # High part
                 NextState("WAIT_ADDR_H"),
             ),
 
-            # Active low. If high, start.
+            # Active low. Go to INIT if low.
             If(~n64_cold_reset, NextState("INIT"))
         )
 
+        # Wait for /ALEH to go low and store the high part of the address.
         fsm.act("WAIT_ADDR_H",
-            state.eq(2),
-            NextValue(led_state, led_state | 0b0100),
-
             sdram_wait.eq(0),
 
             If(n64_alel & ~n64_aleh,
-                # Store high part
                 NextValue(n64_addr_h, n64_ad_in_r),
                 NextState("WAIT_ADDR_L"),
             ),
 
-            # Active low. If high, start.
+            # Active low. Go to INIT if low.
             If(~n64_cold_reset, NextState("INIT"))
         )
 
+        # Wait for /ALEL to go low and store the low part of the address.
         fsm.act("WAIT_ADDR_L",
-            state.eq(3),
-            NextValue(led_state, led_state | 0b0100),
-
             sdram_wait.eq(0),
 
             If(~n64_alel & ~n64_aleh,
-                # Store low part
+                # Store the low part
                 NextValue(n64_addr_l, n64_ad_in_r),
-                # NextValue(n64_addr, Cat(0, n64_ad_in[1:], n64_addr_h)),
+
+                # Store the full address in n64_addr
                 NextValue(n64_addr, Cat(n64_ad_in_r, n64_addr_h)),
 
                 NextState("WAIT_READ_WRITE"),
             ),
 
-            # Active low. If high, start.
+            # Active low. Go to INIT if low.
             If(~n64_cold_reset, NextState("INIT"))
         )
 
-        # Wait for read or write. Perform a read request anyway to be ready.
+        # Wait for read or write.
+        # Performs the read as well.
         fsm.act("WAIT_READ_WRITE",
-            state.eq(4),
-            NextValue(led_state, led_state | 0b1000),
-            # While in this state, we are processing the read request.
-
             sdram_wait.eq(0),
 
             If(n64_read_active,
@@ -279,54 +255,39 @@ class N64CartBus(Module):
                 n64_ad_oe.eq(1),
             ),
 
-            If(~n64_read,
-                # *Always* add a log entry in the logger even if the req. is not for us
-                # If(logger_wr.adr < logger_words - 1,
-                #     # NextValue(counter, counter + 1),
-                #     NextValue(logger_wr.we, 1),
-                #     NextValue(logger_wr.adr, logger_wr.adr + 1),
-                # ),
-                # Uncomment to loop the log
-                # .Else(
-                #     NextValue(logger_wr.we, 1),
-                #     NextValue(logger_wr.adr, 0),
-                # ),
+            # Only accept read request if we should handle it
+            If(~n64_read & sdram_sel,
+                # Enable the read command
+                sdram_port.cmd.valid.eq(1),
+                NextValue(counter, counter + 1),
 
-                # Only accept read request if we should handle it
-                If(~n64_read & roms_cs,
-                    # Enable the read command
-                    sdram_port.cmd.valid.eq(1),
-                    NextValue(counter, counter + 1),
-
-                    # Go to next state when we get the ack
-                    If(sdram_port.cmd.ready & sdram_port.rdata.valid,
-                        # Log number of cycles it took to access data
-                        NextValue(counter, 0),
-                        If(counter > logger_threshold, # Longer than 14 cycles (280ns) is game over with 0x1240 config
-                            NextValue(logger_wr.we, 1),
-                            NextValue(logger_wr.adr, logger_wr.adr + 1),
-                        ),
-
-                        NextValue(n64_read_active, 1),
-                        NextState("WAIT_READ_H"),
+                # Go to next state when we get the ack
+                If(sdram_port.cmd.ready & sdram_port.rdata.valid,
+                    # Log number of cycles it took to access data
+                    NextValue(counter, 0),
+                    If(counter > logger_threshold, # Longer than 14 cycles (280ns) is game over with 0x1240 config
+                        NextValue(logger_wr.we, 1),
+                        NextValue(logger_wr.adr, logger_wr.adr + 1),
                     ),
+
+                    NextValue(n64_read_active, 1),
+                    NextState("WAIT_READ_H"),
                 ),
-            ).Elif(n64_aleh,
-                # Access done.
+            ),
+
+            # When /ALEH goes high the access is done. The state of /READ or /WRITE do not matter.
+            If(n64_aleh,
                 NextValue(n64_read_active, 0),
                 NextState("START"),
             ),
 
-            # Active low. If high, start.
+            # Active low. Go to INIT if low.
             If(~n64_cold_reset, NextState("INIT"))
         )
 
         fsm.act("WAIT_READ_H",
-            state.eq(5),
-            NextValue(led_state, led_state | 0b1000),
-            # The data was latched in the previous state. OE = 1 now
-
             sdram_wait.eq(0),
+            # The data was latched in the previous state. OE = 1 now
 
             n64_ad_out.eq(sdram_data_r),
             n64_ad_oe.eq(1),
@@ -341,6 +302,9 @@ class N64CartBus(Module):
                 NextState("START"),
             ),
 
-            # Active low. If high, start.
+            # Active low. Go to INIT if low.
             If(~n64_cold_reset, NextState("INIT"))
         )
+
+        fsm.do_finalize()
+        fsm.finalized = True
