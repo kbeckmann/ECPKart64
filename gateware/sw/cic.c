@@ -90,11 +90,11 @@ static void Cic6105Algo(void);
 
 /* Select SEED and CHECKSUM here */
 const unsigned char _CicSeed = CIC6102_SEED;
-// const unsigned char _CicSeed = CIC7102_SEED;
+// const unsigned char _CicSeed = CIC6105_SEED;
 
 const unsigned char _CicChecksum[] = {
     CIC6102_CHECKSUM
-    // CIC7102_CHECKSUM
+    // CIC6105_CHECKSUM
 };
 
 
@@ -525,8 +525,6 @@ static void cic_run(void)
             return;
         }
     }
-
-    INFO("Go!\n");
 
     // read the region setting
     isPal = GET_REGION();
