@@ -34,7 +34,9 @@ Data Line, Bidir (DIO):  CIC Pin 15
 
 #include "cic.h"
 
-#define DEBUG
+// #define DEBUG
+
+#define INFO(...) printf("\e[92;1mCIC> \e[0m" __VA_ARGS__)
 
 #define REGION_NTSC (0)
 #define REGION_PAL  (1)
@@ -126,7 +128,7 @@ static int check_running(void)
 
     if (readchar_nonblock()) {
         char c = readchar();
-        printf("Bye! (%02X)\n", c);
+        INFO("Bye! (%02X)\n", c);
 
         // Stop the CIC
         running = 0;
@@ -134,7 +136,7 @@ static int check_running(void)
     }
 
     if (n64_cold_reset_in_read() == 0) {
-        printf("Reset detected!\n");
+        INFO("Reset detected\n");
 
         // Stop the CIC
         running = 0;
@@ -513,7 +515,7 @@ static void cic_run(void)
 
     n64cic_cic_dio_oe_write(0);
 
-    printf("CIC: Wait for reset...\n");
+    INFO("Waiting for reset... Press any key to exit.\n");
     // Wait for reset to be released
     while (n64_cold_reset_in_read() == 0) {
         if (readchar_nonblock()) {
@@ -523,7 +525,7 @@ static void cic_run(void)
         }
     }
 
-    printf("CIC: Start!\n");
+    INFO("Running...\n");
 
     // read the region setting
     isPal = GET_REGION();
@@ -580,7 +582,7 @@ static void cic_run(void)
     }
 
     n64cic_cic_dio_oe_write(0);
-    printf("Killed\n");
+    INFO("Killed!\n");
 }
 
 void main_cic(void)

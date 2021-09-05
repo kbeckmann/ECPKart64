@@ -304,6 +304,10 @@ int main(void)
 	help();
 	prompt();
 
+	// Start CIC automatically (useful when booting from an SDCard)
+	printf("cic\n");
+	main_cic();
+
 	while(1) {
 		console_service();
 	}
