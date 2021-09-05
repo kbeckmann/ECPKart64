@@ -36,6 +36,7 @@ Data Line, Bidir (DIO):  CIC Pin 15
 
 // #define DEBUG
 
+// #define INFO(...)
 #define INFO(...) printf("\e[92;1mCIC> \e[0m" __VA_ARGS__)
 
 #define REGION_NTSC (0)
@@ -525,7 +526,7 @@ static void cic_run(void)
         }
     }
 
-    INFO("Running...\n");
+    INFO("Go!\n");
 
     // read the region setting
     isPal = GET_REGION();
