@@ -176,16 +176,11 @@ class BaseSoC(SoCCore):
         analyzer_signals = [
             # n64cic.cic_dio,
             # n64cic.cic_dclk,
-            # n64_pads.aleh,
-            # n64_pads.alel,
-            # n64_pads.read,
-            # n64_pads.write,
-            # n64cart.cold_reset,
             n64cart.n64cartbus.aleh,
             n64cart.n64cartbus.alel,
             n64cart.n64cartbus.read,
             n64cart.n64cartbus.write,
-            # n64cart.n64cartbus.nmi,
+            n64cart.n64cartbus.nmi,
 
             n64cart.n64cartbus.ad_oe,
             n64cart.n64cartbus.ad_out,
@@ -194,10 +189,8 @@ class BaseSoC(SoCCore):
             n64cart.n64cartbus.n64_addr,
             n64cart.n64cartbus.read_active,
 
-            n64cart.n64cartbus.state,
+            n64cart.n64cartbus.fsm,
 
-            # n64cart.n64cartbus.wb_data_r,
-            sdram_port.cmd.addr, # might not be needed..
             sdram_port.flush,
             sdram_port.cmd.valid,
             sdram_port.cmd.ready,
@@ -205,9 +198,7 @@ class BaseSoC(SoCCore):
             sdram_port.rdata.valid,
             sdram_port.rdata.data,
 
-            self.sdram.controller.refresher.fsm.ongoing("IDLE"),
-            self.sdram.controller.refresher.fsm.ongoing("WAIT-BANK-MACHINES"),
-            self.sdram.controller.refresher.fsm.ongoing("DO-REFRESH"),
+            self.sdram.controller.refresher.fsm,
             self.sdram.controller.refresher.timer.count,
             self.sdram.controller.refresher.timer.wait,
         ]

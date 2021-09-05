@@ -49,7 +49,7 @@ litex_server:
 	$(LITEX_SERVER) --uart --uart-port $(UARTBONE_TTY) --uart-baudrate $(UART_BAUD)
 
 litescope:
-	litescope_cli -v main_n64cartbus_state 2
+	litescope_cli -v main_analyzer_fsm0_state 3
 
 dumper:
 	$(V)$(PYTHON3) -m gateware.ecpkart64.dumper
