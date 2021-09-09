@@ -19,7 +19,7 @@ def parse_args():
     parser.add_argument("--file", default="bootrom.z64", help="z64 ROM file")
     parser.add_argument("--port", default="/dev/ttyUSB1", help="port")
     parser.add_argument("--baudrate", default="1000000", help="baud")
-    parser.add_argument("--header", type=lambda x: int(x, 0), default=0x80374040, help="Override the first word of the ROM")
+    parser.add_argument("--header", type=lambda x: int(x, 0), default=0x80371240, help="Override the first word of the ROM")
     parser.add_argument("--cic", action="store_true", help="Starts the CIC app after upload")
     args = parser.parse_args()
     return args
