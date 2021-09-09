@@ -50,7 +50,7 @@ class K4S561632J_UC75(SDRAMModule):
     # technology_timings = _TechnologyTimings(tREFI=64e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
     # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=40, tRCD=40, tWR=40, tRFC=(None, 128), tFAW=None, tRAS=100)}
 
-    technology_timings = _TechnologyTimings(tREFI=50e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
+    technology_timings = _TechnologyTimings(tREFI=48e6/8192, tWTR=(2, None), tCCD=(1, None), tRRD=(None, 15))
     speedgrade_timings = {"default": _SpeedgradeTimings(tRP=20, tRCD=20, tWR=15, tRFC=(None, 66), tFAW=None, tRAS=44)}
     # speedgrade_timings = {"default": _SpeedgradeTimings(tRP=10, tRCD=10, tWR=10, tRFC=(None, 65), tFAW=None, tRAS=44)}
 
@@ -69,24 +69,23 @@ class _CRG(Module):
 
         # # #
 
-        # Clk / Rst
+        # Clk
         clk16 = platform.request("clk16")
-        rst   = platform.request("rst")
 
         # PLL
         self.submodules.pll = pll = ECP5PLL()
-        self.comb += pll.reset.eq(rst | self.rst)
+        self.comb += pll.reset.eq(self.rst)
         pll.register_clkin(clk16, 16e6)
+        self.clock_domains.cd_usb_12 = ClockDomain()
+        self.clock_domains.cd_usb_48 = ClockDomain()
         pll.create_clkout(self.cd_sys, sys_clk_freq)
+        pll.create_clkout(self.cd_usb_12, 12e6, margin=0)
+        self.comb += self.cd_usb_48.clk.eq(self.cd_sys.clk)
         if sdram_rate == "1:2":
             pll.create_clkout(self.cd_sys2x,    2 * sys_clk_freq)
             pll.create_clkout(self.cd_sys2x_ps, 2 * sys_clk_freq, phase=180) # Idealy 90° but needs to be increased.
         else:
            pll.create_clkout(self.cd_sys_ps, sys_clk_freq, phase=90)
-
-        # 200 MHz clock
-        # self.clock_domains.cd_sys4x = ClockDomain()
-        # pll.create_clkout(self.cd_sys4x, 4 * sys_clk_freq)
 
         # SDRAM clock
         sdram_clk = ClockSignal("sys2x_ps" if sdram_rate == "1:2" else "sys_ps")
@@ -98,9 +97,11 @@ class BaseSoC(SoCCore):
     mem_map = {**SoCCore.mem_map}
     def __init__(self, device="LFE5U-45F", revision="1.0", toolchain="trellis",
         sys_clk_freq=int(50e6), sdram_rate="1:2",
-        with_led_chaser=True,
         **kwargs):
         platform = kilsyth.Platform(device=device, revision=revision, toolchain=toolchain)
+
+        # Build with "--uart-name usb-acm" to enable usb serial
+        platform.add_extension(kilsyth._usb_pmod_io)
 
         # SoCCore ----------------------------------------------------------------------------------
         SoCCore.__init__(self, platform, sys_clk_freq,
@@ -131,24 +132,12 @@ class BaseSoC(SoCCore):
         )
 
         # Add an extra dedicated wishbone bus for the n64 cart
-        # user_port = self.sdram.crossbar.get_port(data_width=32)
-        # sdram_wb = wishbone.Interface(
-        #     user_port.data_width,
-        #     user_port.address_width)
-        # wishbone2native = LiteDRAMWishbone2Native(sdram_wb, user_port)
-        # self.submodules += wishbone2native
-        # sdram_port = self.sdram.crossbar.get_port(data_width=32)
         sdram_port = self.sdram.crossbar.get_port(data_width=16)
 
 
         # Leds -------------------------------------------------------------------------------------
 
         leds = platform.request_all("user_led")
-
-        # if with_led_chaser:
-        #     self.submodules.leds = LedChaser(
-        #         pads         = leds[-2],
-        #         sys_clk_freq = sys_clk_freq)
 
         # N64 Peripheral Interface -----------------------------------------------------------------
 
@@ -192,6 +181,9 @@ class BaseSoC(SoCCore):
 
             n64cart.n64cartbus.fsm,
 
+            n64cart.n64cartbus.sdram_sel,
+            n64cart.n64cartbus.custom_sel,
+
             sdram_port.flush,
             sdram_port.cmd.valid,
             sdram_port.cmd.ready,
@@ -225,7 +217,7 @@ def main():
     parser.add_argument("--toolchain",       default="trellis",     help="FPGA toolchain: trellis (default) or diamond")
     parser.add_argument("--device",          default="LFE5U-45F",   help="FPGA device: LFE5U-12F, LFE5U-25F, LFE5U-45F (default)  or LFE5U-85F")
     parser.add_argument("--revision",        default="1.0",         help="Board revision: 1.0 (default)")
-    parser.add_argument("--sys-clk-freq",    default=50e6,          help="System clock frequency  (default: 48MHz)")
+    parser.add_argument("--sys-clk-freq",    default=48e6,          help="System clock frequency  (default: 48MHz)")
     parser.add_argument("--sdram-rate",      default="1:1",         help="SDRAM Rate: 1:1 Full Rate (default), 1:2 Half Rate")
     builder_args(parser)
     soc_core_args(parser)

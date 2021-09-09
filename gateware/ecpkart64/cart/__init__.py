@@ -4,14 +4,12 @@
 # Copyright (c) 2021 Konrad Beckmann <konrad.beckmann@gmail.com>
 # SPDX-License-Identifier: BSD-2-Clause
 
+from re import M
 from migen import *
 from migen.genlib.cdc import MultiReg
 
 from litex.soc.interconnect import wishbone
 from litex.soc.interconnect.csr import *
-
-from struct import pack, unpack
-import os
 
 # N64 Cart integration ---------------------------------------------------------------------------------------
 
@@ -59,6 +57,38 @@ class N64Cart(Module, AutoCSR):
         )
 
 
+class TestImageGenerator(Module):
+    def __init__(self, addr, data, active):
+        self.frame = frame = Signal(16)
+        self.speed = 1
+
+        # Hard code for 512 x 256
+
+        h_ctr = addr[:9]
+        v_ctr = addr[9:]
+
+        r = Signal(8)
+        g = Signal(8)
+        b = Signal(8)
+
+        self.sync += If((addr == 0) & active, frame.eq(frame + 1))
+
+        frame_tri = Mux(frame[8], ~frame[:8], frame[:8])
+        frame_tri2 = Mux(frame[9], ~frame[1:9], frame[1:9])
+
+        X = Mux(v_ctr[6], h_ctr + frame[self.speed:], h_ctr - frame[self.speed:])
+        Y = v_ctr
+
+        self.comb += [
+            r.eq(frame_tri[1:]),
+            g.eq(v_ctr * Mux(X & Y, 255, 0)),
+            b.eq(~(frame_tri2 + (X ^ Y)) * 255),
+        ]
+
+        self.comb += data.eq(Cat(1, b[-5:], g[-5:], r[-5:]))
+
+
+
 class N64CartBus(Module):
     def __init__(self, pads, sdram_port, sdram_wait, logger_wr, logger_words, logger_threshold, rom_header_csr):
         self.pads = pads
@@ -93,47 +123,34 @@ class N64CartBus(Module):
         n64_ad_in_r = Signal.like(n64_ad_in)
         self.sync += n64_ad_in_r.eq(n64_ad_in)
 
-
-        ### WIP: Read a simple demo rom and place it in BRAM
-
-        if (os.path.isfile("bootrom.z64")):
-            with open("bootrom.z64", "rb") as f:
-            # with open("bootrom2.z64", "rb") as f:
-                # Read the first 74kB (37k words) from the bootrom (controller example)
-                rom_words = 37 * 1024
-                rom_bytes = rom_words * 2
-                rom_data = unpack(f">{rom_words}H", f.read()[:rom_words * 2])
-        else:
-            rom_words = 16 * 1024
-            rom_bytes = rom_words * 2
-            rom_data = pack(f">{rom_words}H", *[i for i in range(rom_words)])
-
-        rom = Memory(width=16, depth=rom_words, init=rom_data)
-        rom_port = rom.get_port()
-        self.specials += rom, rom_port
-
-
         # Handle bus access
         n64_addr_l = Signal(16)
         n64_addr_h = Signal(16)
         self.n64_addr = n64_addr = Signal(32)
-        sdram_sel = Signal()
 
-        # 0x10000000	0x1FBFFFFF	Cartridge Domain 1 Address 2	Cartridge ROM
-        # self.comb += If(n64_addr[27:] == 0b00001, # 0x10000000
-        #                 rom_port.adr.eq(n64_addr[1:]),
-        #                 sdram_sel.eq(1),
-        #              )
+        # Memory area selectors
+        self.sdram_sel = sdram_sel = Signal()
+        self.custom_sel = custom_sel = Signal()
 
-        self.comb += If((n64_addr >= 0x1000_0000) & (n64_addr < 0x1FC0_0000),
-                        rom_port.adr.eq(n64_addr[1:24]),
-                        sdram_sel.eq(1),
+        # 0x10000000 - 0x1FBFFFFF (252 MB): Domain 1 Address 2 Cartridge ROM
+        # Map  0MB - 32MB to physical SDRAM
+        # Map 32MB - 64MB to custom gateware
+
+        # Kind of a hacky address decoder, but it works for now.
+        self.comb += If(n64_addr >= 0x1000_0000,
+                        If(n64_addr < 0x1000_0000 + 32*1024*1024,
+                            # 0 - 32MB
+                            sdram_sel.eq(1),
+                        ).Elif(n64_addr < 0x1000_0000 + 64*1024*1024,
+                            # 32 - 64MB
+                            custom_sel.eq(1),
+                        )
                      )
 
         # SDRAM direct port
         self.sdram_port = sdram_port
         sdram_data   = Signal(16)
-        self.sdram_data_r = sdram_data_r = Signal(16)
+        n64_ad_out_r = Signal(16)
 
         self.comb += [
             # 16 bit
@@ -176,14 +193,28 @@ class N64CartBus(Module):
                 # )),
             ),
         ]
-        self.sync += If(sdram_port.rdata.valid, sdram_data_r.eq(sdram_data))
-
         self.read_active = n64_read_active = Signal()
 
         counter = Signal(32)
         self.sync += logger_wr.dat_w.eq(counter)
         # self.comb += logger_wr.dat_w.eq(n64_addr)
         self.sync += If(logger_wr.we, logger_wr.we.eq(0))
+
+        # ------- Custom data generator
+        custom_sel_stb = Signal()
+        self.sync += custom_sel_stb.eq(0)
+        self.custom_data = custom_data = Signal(16)
+        self.custom_addr = custom_addr = n64_addr[1:25] # 16M 16-bit words
+        self.submodules += TestImageGenerator(custom_addr, custom_data, custom_sel_stb)
+
+        self.sync += \
+        If(sdram_sel,
+            If(sdram_port.rdata.valid, n64_ad_out_r.eq(sdram_data))
+        ).Elif(custom_sel,
+            n64_ad_out_r.eq(custom_data),
+        )
+
+
 
         self.fsm = fsm = FSM(reset_state="INIT")
         self.submodules += fsm
@@ -248,28 +279,46 @@ class N64CartBus(Module):
         fsm.act("WAIT_READ_WRITE",
             sdram_wait.eq(0),
 
-            If(n64_read_active,
-                # Save one cycle latency by using rdata.valid - when this signal is high,
-                # sdram_data contains valid data. (Later on, it will not, and we need to use our register)
-                n64_ad_out.eq(Mux(sdram_port.rdata.valid, sdram_data, sdram_data_r)),
-                n64_ad_oe.eq(1),
+            # ------------ SDRAM
+            If(sdram_sel,
+                If(n64_read_active,
+                    # Save one cycle latency by using rdata.valid - when this signal is high,
+                    # sdram_data contains valid data. (Later on, it will not, and we need to use our register)
+                    n64_ad_out.eq(Mux(sdram_port.rdata.valid, sdram_data, n64_ad_out_r)),
+                    n64_ad_oe.eq(1),
+                ),
+
+                # Read access starts
+                If(~n64_read,
+                    # Enable the read command
+                    sdram_port.cmd.valid.eq(1),
+                    NextValue(counter, counter + 1),
+
+                    # Go to next state when we get the ack
+                    If(sdram_port.cmd.ready & sdram_port.rdata.valid,
+                        # Log number of cycles it took to access data
+                        NextValue(counter, 0),
+                        If(counter > logger_threshold, # Longer than 14 cycles (280ns) is game over with 0x1240 config
+                            NextValue(logger_wr.we, 1),
+                            NextValue(logger_wr.adr, logger_wr.adr + 1),
+                        ),
+
+                        NextValue(n64_read_active, 1),
+                        NextState("WAIT_READ_H"),
+                    ),
+                ),
             ),
 
-            # Only accept read request if we should handle it
-            If(~n64_read & sdram_sel,
-                # Enable the read command
-                sdram_port.cmd.valid.eq(1),
-                NextValue(counter, counter + 1),
+            # ------------ Custom area
+            If(custom_sel,
+                If(n64_read_active,
+                    n64_ad_out.eq(n64_ad_out_r),
+                    n64_ad_oe.eq(1),
+                ),
 
-                # Go to next state when we get the ack
-                If(sdram_port.cmd.ready & sdram_port.rdata.valid,
-                    # Log number of cycles it took to access data
-                    NextValue(counter, 0),
-                    If(counter > logger_threshold, # Longer than 14 cycles (280ns) is game over with 0x1240 config
-                        NextValue(logger_wr.we, 1),
-                        NextValue(logger_wr.adr, logger_wr.adr + 1),
-                    ),
-
+                # Read access starts
+                If(~n64_read,
+                    NextValue(custom_sel_stb, 1),
                     NextValue(n64_read_active, 1),
                     NextState("WAIT_READ_H"),
                 ),
@@ -289,7 +338,7 @@ class N64CartBus(Module):
             sdram_wait.eq(0),
             # The data was latched in the previous state. OE = 1 now
 
-            n64_ad_out.eq(sdram_data_r),
+            n64_ad_out.eq(n64_ad_out_r),
             n64_ad_oe.eq(1),
 
             If(n64_read,
