@@ -132,20 +132,18 @@ class N64CartBus(Module):
         self.sdram_sel = sdram_sel = Signal()
         self.custom_sel = custom_sel = Signal()
 
-        # 0x10000000 - 0x1FBFFFFF (252 MB): Domain 1 Address 2 Cartridge ROM
-        # Map  0MB - 32MB to physical SDRAM
-        # Map 32MB - 64MB to custom gateware
-
         # Kind of a hacky address decoder, but it works for now.
-        self.comb += If(n64_addr >= 0x1000_0000,
-                        If(n64_addr < 0x1000_0000 + 32*1024*1024,
-                            # 0 - 32MB
-                            sdram_sel.eq(1),
-                        ).Elif(n64_addr < 0x1000_0000 + 64*1024*1024,
-                            # 32 - 64MB
-                            custom_sel.eq(1),
-                        )
-                     )
+        self.comb += \
+            If((n64_addr[-8:] >= 0x08) & (n64_addr[-8:] <= 0x0F), 
+                # 0x08000000 - 0x0FFFFFFF (128 MB): Cartridge Domain 2 Address 2 Cartridge SRAM
+                custom_sel.eq(1),
+            ).Elif((n64_addr[-8:] >= 0x10) & (n64_addr[-8:] <= 0x1F), 
+                # 0x10000000 - 0x1FBFFFFF (252 MB): Domain 1 Address 2 Cartridge ROM
+                If(n64_addr < 0x1000_0000 + 32*1024*1024,
+                    # 0 - 32MB
+                    sdram_sel.eq(1),
+                )
+            )
 
         # SDRAM direct port
         self.sdram_port = sdram_port
