@@ -22,16 +22,20 @@ GATEWARE_SRC = $(shell find gateware -name '*.py')
 
 all: bitstream app
 
+$(BUILD_DIR):
+	$(V)$(ECHO) [ MKDIR ] $(BUILD_DIR)
+	mkdir -p $(BUILD_DIR)
+
 bitstream: $(BUILD_DIR)/gateware/$(TARGET).bit
 
 app: $(BUILD_DIR)/software/app/app.bin
 
 $(BUILD_DIR)/software/app/app.bin:
-	$(V)$(MAKE) -C gateware/sw
+	$(V)$(MAKE) -C gateware/sw 2>&1 | tee $(BUILD_DIR)/app_$(shell date '+%Y%m%d_%H%M%S').log
 .PHONY: $(BUILD_DIR)/software/app/app.bin
 
-$(BUILD_DIR)/gateware/$(TARGET).bit: $(GATEWARE_SRC)
-	$(V)$(PYTHON3) -m gateware.ecpkart64.targets.$(TARGET) --build --csr-csv csr.csv --doc
+$(BUILD_DIR)/gateware/$(TARGET).bit: $(GATEWARE_SRC) $(BUILD_DIR)
+	$(V)$(PYTHON3) -m gateware.ecpkart64.targets.$(TARGET) --build --csr-csv csr.csv --doc 2>&1 | tee $(BUILD_DIR)/gateware_$(shell date '+%Y%m%d_%H%M%S').log
 
 
 load_bitstream: bitstream
