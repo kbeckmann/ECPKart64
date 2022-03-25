@@ -21,10 +21,16 @@ jobs:
       - name: Install Tools
         run: |
           sudo apt-get install wget build-essential python3
+          echo AAAAAAAAAAAA1
+          pip3 install --upgrade pip
+          echo AAAAAAAAAAAA2
           pip3 install setuptools
+          echo AAAAAAAAAAAA3
           pip3 install requests
+          echo AAAAAAAAAAAA4
           # Remove bundled migen from YosysHQ/setup-oss-cad-suite
           pip3 uninstall migen
+          echo AAAAAAAAAAAA5
       # Install (n)Migen / LiteX / Cores
       - name: Install LiteX
         run: |
