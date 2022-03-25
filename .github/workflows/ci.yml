@@ -27,12 +27,8 @@ jobs:
       - name: Install LiteX
         run: |
           wget https://raw.githubusercontent.com/enjoy-digital/litex/master/litex_setup.py
-          python3 litex_setup.py init install --user
-      # Install RISC-V GCC
-      - name: Install RISC-V GCC
-        run: |
-          wget https://raw.githubusercontent.com/enjoy-digital/litex/master/litex_setup.py
-          python3 litex_setup.py gcc
+          python3 litex_setup.py --config=full --init --install --user
+          python3 litex_setup.py --gcc=riscv
           ls $PWD/../riscv64-*/bin/
           export PATH=$PATH:$(echo $PWD/../riscv64-*/bin/)
           riscv64-unknown-elf-gcc --version
