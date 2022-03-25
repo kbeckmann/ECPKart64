@@ -26,7 +26,7 @@ jobs:
           echo AAAA1.5
           pip3 install --upgrade pip
           echo AAAA2
-          python3 -m venv env
+          python3 -m virtualenv env
           echo AAAA3
           source env/bin/activate
           echo AAAA4
