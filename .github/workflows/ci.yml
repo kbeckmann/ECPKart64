@@ -21,12 +21,19 @@ jobs:
       - name: Install Tools
         run: |
           sudo apt-get install wget build-essential python3
+          echo AAAA1
           pip3 install virtualenv
+          echo AAAA2
           python3 -m venv env
+          echo AAAA3
           source env/bin/activate
+          echo AAAA4
           pip3 install --upgrade pip
+          echo AAAA5
           pip3 install setuptools
+          echo AAAA6
           pip3 install requests
+          echo AAAA7
 
       # Install LiteX + toolchains
       - name: Install LiteX
