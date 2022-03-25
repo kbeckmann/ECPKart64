@@ -23,6 +23,8 @@ jobs:
           sudo apt-get install wget build-essential python3
           pip3 install setuptools
           pip3 install requests
+          # Remove bundled migen from YosysHQ/setup-oss-cad-suite
+          pip3 uninstall migen
       # Install (n)Migen / LiteX / Cores
       - name: Install LiteX
         run: |
