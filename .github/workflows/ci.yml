@@ -23,6 +23,8 @@ jobs:
           sudo apt-get install wget build-essential python3
           echo AAAA1
           pip3 install virtualenv
+          echo AAAA1.5
+          pip3 install --upgrade pip
           echo AAAA2
           python3 -m venv env
           echo AAAA3
