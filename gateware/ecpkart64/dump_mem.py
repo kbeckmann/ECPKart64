@@ -14,6 +14,8 @@ from litex import RemoteClient
 def parse_args():
     parser = argparse.ArgumentParser(description="""ECPKart64 Dump Utility""")
     parser.add_argument("--csr-csv", default="csr.csv", help="SoC CSV file")
+    parser.add_argument("--address", default=0x40000000)
+    parser.add_argument("--length", default=64)
     args = parser.parse_args()
     return args
 
@@ -27,15 +29,16 @@ def main():
     bus = RemoteClient(csr_csv=args.csr_csv)
     bus.open()
 
-    log_entries = bus.regs.n64_logger_idx.read()
-    print(f"Log entries: {log_entries + 1}")
-
-    base = bus.mems.n64slave.base
+    base = args.address
 
     try:
-        for addr in range(base, base + log_entries * 4, 4):
+        for addr in range(base, base + args.length, 4):
             value = bus.read(addr)
-            print(f"{(addr - base)//4:04X}: {value:08X}")
+            v0 = value         & 0xff
+            v1 = (value >>  8) & 0xff
+            v2 = (value >> 16) & 0xff
+            v3 = (value >> 24) & 0xff
+            print(f"{addr:08X}: {v0:02X} {v1:02X} {v2:02X} {v3:02X}")
 
     finally:
         bus.close()
