@@ -9,6 +9,7 @@
 import os
 import argparse
 
+from tqdm import tqdm
 from struct import unpack
 from litex import RemoteClient
 import serial
@@ -45,8 +46,13 @@ def main():
             print("Opening...")
             data_bytes = f.read()
             port.write(bytes(f"\n\nmem_load {hex(base)} {len(data_bytes)}\n".encode("utf-8")))
-            print("Starting load...")
-            port.write(data_bytes)
+
+            chunks = (len(data_bytes) + 1023) // 1024
+            with tqdm(total=chunks, desc="Uploading", bar_format="{l_bar}{bar} [ time left: {remaining} ]") as pbar:
+                for chunk in range(chunks):
+                    port.write(data_bytes[chunk*1024:(chunk+1)*1024])
+                    pbar.update(1)
+
             port.write(bytes(f"set_header {hex(args.header)}\n".encode("utf-8")))
             if args.cic:
                 port.write(bytes(f"cic\n".encode("utf-8")))
