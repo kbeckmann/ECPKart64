@@ -42,13 +42,16 @@ def main():
 
     try:
         with open(args.file, "rb") as f:
+            print("Opening...")
             data_bytes = f.read()
             port.write(bytes(f"\n\nmem_load {hex(base)} {len(data_bytes)}\n".encode("utf-8")))
+            print("Starting load...")
             port.write(data_bytes)
             port.write(bytes(f"set_header {hex(args.header)}\n".encode("utf-8")))
             if args.cic:
                 port.write(bytes(f"cic\n".encode("utf-8")))
             f.close()
+            print("Done...")
 
     finally:
         bus.close()

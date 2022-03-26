@@ -108,7 +108,7 @@ static void reboot_cmd(void)
 }
 
 #define NUMBER_OF_BYTES_ON_A_LINE 16
-static void dump_bytes(unsigned int *ptr, int count, unsigned long addr)
+static void dump_bytes(uint32_t *ptr, int count, unsigned long addr)
 {
 	char *data = (char *)ptr;
 	int line_bytes = 0, i = 0;
@@ -177,7 +177,7 @@ static void mem_load(char *address_str, char *len_str)
 		uint8_t  byte[4];
 	} value;
 
-	printf("Reading %d words\n", words);
+	printf("Reading %ld words\n", words);
 
 	for (int i = 0; i < words; i++) {
 		value.byte[0] = readchar();

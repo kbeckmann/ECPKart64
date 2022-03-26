@@ -100,7 +100,7 @@ def sdcard_pmod_io(pmod="PMOD2"):
             Subsignal("data", Pins(f"{pmod}:3 {pmod}:7 {pmod}:8 {pmod}:1"), Misc("PULLMODE=UP")),
             Subsignal("clk",  Pins(f"{pmod}:4")),
             Subsignal("cmd",  Pins(f"{pmod}:2"), Misc("PULLMODE=UP")),
-            Subsignal("cd",   Pins(f"{pmod}:9")),
+            # Subsignal("cd",   Pins(f"{pmod}:9")),
             Misc("SLEWRATE=FAST"),
             IOStandard("LVCMOS33"),
         ),

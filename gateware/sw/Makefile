@@ -2,12 +2,8 @@ TARGET    ?= kilsyth
 BUILD_DIR ?= ../../build/$(TARGET)
 APP_DIR   ?= $(BUILD_DIR)/software/app
 
-# TTY for loading the application
-TTYDEV    ?= /dev/ttyUSB0
-
 # Tools
 ECHO      ?= echo
-LXTERM    ?= lxterm
 
 include $(BUILD_DIR)/software/include/generated/variables.mak
 include common.mak
@@ -26,6 +22,7 @@ C_SOURCES =  \
 	sha256.c \
 
 OBJECTS = $(addprefix $(APP_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
+OBJECTS += $(APP_DIR)/crt0.o
 
 all: $(APP_DIR) $(APP_DIR)/app.bin
 
@@ -45,11 +42,9 @@ $(APP_DIR)/app.elf: $(OBJECTS)
 	$(V)$(CC) $(LDFLAGS) \
 		-T linker.ld \
 		-N -o $@ \
-		$(BUILD_DIR)/software/libbase/crt0.o \
 		$(OBJECTS) \
-		-L$(BUILD_DIR)/software/libbase \
-		-L$(BUILD_DIR)/software/libcompiler_rt \
-		-lbase-nofloat -lcompiler_rt
+		$(PACKAGES:%=-L$(BUILD_DIR)/software/%) \
+		$(LIBS:lib%=-l%)
 	$(V)chmod -x $@
 
 $(APP_DIR)/%.o: %.c Makefile | $(APP_DIR)
@@ -60,11 +55,12 @@ $(APP_DIR)/%.o: %.S Makefile | $(APP_DIR)
 	$(V)$(ECHO) [ CC ] $(notdir $@)
 	$(V)$(assemble)
 
-load: $(APP_DIR)/app.bin
-	$(V)$(LXTERM) $(TTYDEV) --serial-boot --kernel=$(APP_DIR)/app.bin
+$(APP_DIR)/crt0.o: $(CPU_DIRECTORY)/crt0.S
+	$(V)$(ECHO) [ CC ] $(notdir $@)
+	$(V)$(assemble)
 
 clean:
 	$(V)$(ECHO) [ RM ] $(APP_DIR)
 	$(V)-rm -fR $(APP_DIR)
 
-.PHONY: all clean load
+.PHONY: all clean

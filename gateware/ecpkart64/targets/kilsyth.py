@@ -76,11 +76,15 @@ class _CRG(Module):
         self.submodules.pll = pll = ECP5PLL()
         self.comb += pll.reset.eq(self.rst)
         pll.register_clkin(clk16, 16e6)
-        self.clock_domains.cd_usb_12 = ClockDomain()
         self.clock_domains.cd_usb_48 = ClockDomain()
         pll.create_clkout(self.cd_sys, sys_clk_freq)
-        pll.create_clkout(self.cd_usb_12, 12e6, margin=0)
-        self.comb += self.cd_usb_48.clk.eq(self.cd_sys.clk)
+
+        # USB stuff
+        if False:
+            self.clock_domains.cd_usb_12 = ClockDomain()
+            pll.create_clkout(self.cd_usb_12, 12e6, margin=0)
+            self.comb += self.cd_usb_48.clk.eq(self.cd_sys.clk)
+
         if sdram_rate == "1:2":
             pll.create_clkout(self.cd_sys2x,    2 * sys_clk_freq)
             pll.create_clkout(self.cd_sys2x_ps, 2 * sys_clk_freq, phase=180) # Idealy 90° but needs to be increased.
@@ -106,8 +110,6 @@ class BaseSoC(SoCCore):
         # SoCCore ----------------------------------------------------------------------------------
         SoCCore.__init__(self, platform, sys_clk_freq,
             ident          = "LiteX SoC on Kilsyth",
-            ident_version  = True,
-            uart_baudrate  = 1000000,
             **kwargs)
 
         # CRG --------------------------------------------------------------------------------------
@@ -148,7 +150,6 @@ class BaseSoC(SoCCore):
                 sdram_port   = sdram_port,
                 sdram_wait   = self.sdram.controller.refresher.timer.wait,
                 fast_cd      = "sys",
-                #fast_cd      = "sys4x",
         )
         self.bus.add_slave("n64slave", self.n64.wb_slave, region=SoCRegion(origin=0x30000000, size=0x10000))
 
@@ -189,7 +190,7 @@ class BaseSoC(SoCCore):
             sdram_port.cmd.ready,
             sdram_port.rdata.ready,
             sdram_port.rdata.valid,
-            sdram_port.rdata.data,
+            # sdram_port.rdata.data,
 
             self.sdram.controller.refresher.fsm,
             self.sdram.controller.refresher.timer.count,
