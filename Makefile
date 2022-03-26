@@ -66,8 +66,8 @@ litex_server:
 litescope:
 	litescope_cli -v main_analyzer_fsm0_state 3
 
-dumper:
-	$(V)$(PYTHON3) -m gateware.ecpkart64.dumper
+dump_logger:
+	$(V)$(PYTHON3) -m gateware.ecpkart64.dump_logger
 
 
 clean:
