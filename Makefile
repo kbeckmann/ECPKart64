@@ -53,7 +53,7 @@ load_bitstream:
 	$(V)$(PYTHON3) -m gateware.ecpkart64.targets.$(TARGET) --load --no-compile-software --no-compile-gateware
 
 load_app: app
-	$(V)$(LXTERM) $(UART_TTY) --speed $(UART_BAUD) --kernel=$(BUILD_DIR)/software/app/app.bin --kernel-adr=$(APP_ADDR)
+	$(V)$(LXTERM) $(UART_TTY) --speed $(UART_BAUD) --serial-boot --safe --kernel=$(BUILD_DIR)/software/app/app.bin --kernel-adr=$(APP_ADDR)
 
 
 ### Debug tools
