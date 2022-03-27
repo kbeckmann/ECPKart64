@@ -8,9 +8,11 @@
 
 import os
 import argparse
-import struct
+import binascii
 
 from litex import RemoteClient
+
+from .util.dump import dump_binary
 
 def parse_args():
     parser = argparse.ArgumentParser(description="""ECPKart64 Dump Utility""")
@@ -30,30 +32,19 @@ def main():
         raise ValueError("{} not found. This is necessary to load the 'regs' of the remote. Try setting --csr-csv here to "
                          "the path to the --csr-csv argument of the SoC build.".format(args.csr_csv))
 
-    bus = RemoteClient(csr_csv=args.csr_csv)
-    bus.open()
-    base = args.address
-
-    data = []
-    total_words = (args.length + 3) // 4
-    chunks = (total_words + 127) // 128
-    for chunk in range(chunks):
-        data += bus.read(base + 4 * 128 * chunk, 128 if chunk != chunks - 1 else total_words)
-        total_words -= 128
-
-    bus.close()
+    data = dump_binary(args.csr_csv, args.address, args.length)
 
     if args.file is not None:
-        args.file.write(struct.pack(f"<{len(data)}I", *data))
+        args.file.write(data)
         args.file.close()
 
     if args.print:
-        for i, value in enumerate(data):
-            v0 = value         & 0xff
-            v1 = (value >>  8) & 0xff
-            v2 = (value >> 16) & 0xff
-            v3 = (value >> 24) & 0xff
-            print(f"{base + i*4:08X}: {v0:02X} {v1:02X} {v2:02X} {v3:02X}")
+        hexdata = binascii.hexlify(data).decode("utf-8")
+        for i in range(0, len(hexdata), 16):
+            line = f"{args.address + i//2:08X}  "
+            for j in range(i, i+16, 2):
+                line += f"{hexdata[j:j+2]} "
+            print(line)
 
 if __name__ == "__main__":
     main()
