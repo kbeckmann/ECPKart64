@@ -158,9 +158,14 @@ class N64CartBus(Module):
             # sdram_port.cmd.addr.eq(n64_addr[2:27]),
 
             sdram_port.cmd.we.eq(0),
-            sdram_port.cmd.last.eq(1),
             sdram_port.rdata.ready.eq(1),
+            sdram_port.cmd.last.eq(1),
             sdram_port.flush.eq(0),
+
+            # TODO?
+            # port.cmd.last.eq(~wishbone.we), # Always wait for reads.
+            # port.flush.eq(~wishbone.cyc)    # Flush writes when transaction ends.
+
             If((n64_addr[2:27] == 0) & (rom_header_csr.storage != 0),
                 # Configure the bus to run at a slower speed *for now*
                 # 50 MHz = 20ns
@@ -192,6 +197,7 @@ class N64CartBus(Module):
             ),
         ]
         self.read_active = n64_read_active = Signal()
+        self.write_active = n64_write_active = Signal()
 
         counter = Signal(32)
         self.sync += logger_wr.dat_w.eq(counter)
@@ -305,6 +311,23 @@ class N64CartBus(Module):
                         NextState("WAIT_READ_H"),
                     ),
                 ),
+
+                # Write access starts
+                If(~n64_write,
+                    # Enable the write command, if it's ready
+                    # FIXME: It breaks sometimes when uncommented. Why?
+                    # If(sdram_port.cmd.ready == 1,
+                        sdram_port.cmd.valid.eq(1),
+                        sdram_port.cmd.we.eq(1),
+                        sdram_port.wdata.valid.eq(1),
+                        sdram_port.wdata.we.eq(0b11), # enable both bytes
+                        sdram_port.wdata.data.eq(n64_ad_in_r),
+
+                        If(sdram_port.wdata.ready,
+                            NextState("WAIT_WRITE_H"),
+                        )
+                    # )
+                ),
             ),
 
             # ------------ Custom area
@@ -346,6 +369,24 @@ class N64CartBus(Module):
             ).Elif(n64_alel | n64_aleh,
                 # Request done, return.
                 NextValue(n64_read_active, 0),
+                NextState("START"),
+            ),
+
+            # Active low. Go to INIT if low.
+            If(~n64_cold_reset, NextState("INIT"))
+        )
+
+        fsm.act("WAIT_WRITE_H",
+            # The write request has been handled
+            # sdram_port.flush.eq(1),
+
+            If(n64_write,
+                # Increase address
+                NextValue(n64_addr, n64_addr + 2),
+                NextState("WAIT_READ_WRITE"),
+            ).Elif(n64_alel | n64_aleh,
+                # Request done, return.
+                NextValue(n64_write_active, 0),
                 NextState("START"),
             ),
 

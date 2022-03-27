@@ -14,8 +14,8 @@ from litex import RemoteClient
 def parse_args():
     parser = argparse.ArgumentParser(description="""ECPKart64 Dump Utility""")
     parser.add_argument("--csr-csv", default="csr.csv", help="SoC CSV file")
-    parser.add_argument("--address", default=0x40000000)
-    parser.add_argument("--length", default=64)
+    parser.add_argument("--address", default=0x40000000, type=lambda x: int(x, 0))
+    parser.add_argument("--length", default=64, type=int)
     args = parser.parse_args()
     return args
 

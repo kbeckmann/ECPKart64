@@ -179,6 +179,7 @@ class BaseSoC(SoCCore):
 
             n64cart.n64cartbus.n64_addr,
             n64cart.n64cartbus.read_active,
+            n64cart.n64cartbus.write_active,
 
             n64cart.n64cartbus.fsm,
 
@@ -191,6 +192,8 @@ class BaseSoC(SoCCore):
             sdram_port.rdata.ready,
             sdram_port.rdata.valid,
             # sdram_port.rdata.data,
+            sdram_port.wdata.ready,
+            sdram_port.wdata.valid,
 
             self.sdram.controller.refresher.fsm,
             self.sdram.controller.refresher.timer.count,
