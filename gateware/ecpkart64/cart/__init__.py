@@ -15,7 +15,7 @@ from litex.soc.interconnect.csr import *
 
 class N64Cart(Module, AutoCSR):
 
-    def __init__(self, pads, sdram_port, sdram_wait, fast_cd="sys2x"):
+    def __init__(self, pads, sdram_port, sdram_wait, mailbox_bus_r, mailbox_bus_w, fast_cd="sys2x"):
         self.pads = pads
 
         self.logger_idx = CSRStatus(32, description="Logger index")
@@ -53,51 +53,23 @@ class N64Cart(Module, AutoCSR):
             logger_wr,
             logger_words,
             self.logger_threshold.storage,
-            self.rom_header
+            self.rom_header,
+            mailbox_bus_r,
+            mailbox_bus_w
         )
 
 
-class TestImageGenerator(Module):
-    def __init__(self, addr, data, active):
-        self.frame = frame = Signal(16)
-        self.speed = 1
-
-        # Hard code for 512 x 256
-
-        h_ctr = addr[:9]
-        v_ctr = addr[9:]
-
-        r = Signal(8)
-        g = Signal(8)
-        b = Signal(8)
-
-        self.sync += If((addr == 0) & active, frame.eq(frame + 1))
-
-        frame_tri = Mux(frame[8], ~frame[:8], frame[:8])
-        frame_tri2 = Mux(frame[9], ~frame[1:9], frame[1:9])
-
-        X = Mux(v_ctr[6], h_ctr + frame[self.speed:], h_ctr - frame[self.speed:])
-        Y = v_ctr
-
-        self.comb += [
-            r.eq(frame_tri[1:]),
-            g.eq(v_ctr * Mux(X & Y, 255, 0)),
-            b.eq(~(frame_tri2 + (X ^ Y)) * 255),
-        ]
-
-        self.comb += data.eq(Cat(1, b[-5:], g[-5:], r[-5:]))
-
-
-
 class N64CartBus(Module):
-    def __init__(self, pads, sdram_port, sdram_wait, logger_wr, logger_words, logger_threshold, rom_header_csr):
+    def __init__(self, pads, sdram_port, sdram_wait, logger_wr, logger_words, logger_threshold, rom_header_csr, mailbox_bus_r, mailbox_bus_w):
         self.pads = pads
 
         self.cold_reset = n64_cold_reset = Signal()
         self.aleh = n64_aleh = Signal()
         self.alel = n64_alel = Signal()
         self.read = n64_read = Signal()
+        self.read_r = n64_read_r = Signal()
         self.write = n64_write = Signal()
+        self.write_r = n64_write_r = Signal()
         self.nmi = n64_nmi = Signal()
 
         self.specials += MultiReg(pads.aleh,       n64_aleh)
@@ -121,7 +93,11 @@ class N64CartBus(Module):
 
         # Keep a register with the previous value
         n64_ad_in_r = Signal.like(n64_ad_in)
-        self.sync += n64_ad_in_r.eq(n64_ad_in)
+        self.sync += [
+            n64_ad_in_r.eq(n64_ad_in),
+            n64_read_r.eq(n64_read),
+            n64_write_r.eq(n64_write),
+        ]
 
         # Handle bus access
         n64_addr_l = Signal(16)
@@ -131,17 +107,25 @@ class N64CartBus(Module):
         # Memory area selectors
         self.sdram_sel = sdram_sel = Signal()
         self.custom_sel = custom_sel = Signal()
+        self.mailbox_r_sel = mailbox_r_sel = Signal()
+        self.mailbox_w_sel = mailbox_w_sel = Signal()
 
         # Kind of a hacky address decoder, but it works for now.
         self.comb += \
-            If((n64_addr[-8:] >= 0x08) & (n64_addr[-8:] <= 0x0F), 
+            If((n64_addr[-8:] >= 0x08) & (n64_addr[-8:] <= 0x0F),
                 # 0x08000000 - 0x0FFFFFFF (128 MB): Cartridge Domain 2 Address 2 Cartridge SRAM
                 custom_sel.eq(1),
-            ).Elif((n64_addr[-8:] >= 0x10) & (n64_addr[-8:] <= 0x1F), 
+            ).Elif((n64_addr[-8:] >= 0x10) & (n64_addr[-8:] <= 0x1F),
                 # 0x10000000 - 0x1FBFFFFF (252 MB): Domain 1 Address 2 Cartridge ROM
                 If(n64_addr < 0x1000_0000 + 32*1024*1024,
                     # 0 - 32MB
                     sdram_sel.eq(1),
+                ).Elif((n64_addr >= (0x1000_0000 + 64*1024*1024)) & (n64_addr < (0x1000_0000 + 64*1024*1024 + 0x100)),
+                    # 0x14000000
+                    mailbox_w_sel.eq(1),
+                ).Elif((n64_addr >= (0x1000_0000 + 64*1024*1024 + 0x100)) & (n64_addr < (0x1000_0000 + 64*1024*1024 + 0x200)),
+                    # 0x14000100
+                    mailbox_r_sel.eq(1),
                 )
             )
 
@@ -152,10 +136,8 @@ class N64CartBus(Module):
 
         self.comb += [
             # 16 bit
+            # sdram_port.cmd.addr.eq(Mux(n64_write, n64_addr[1:27], n64_addr[1:27] ^ 1)),
             sdram_port.cmd.addr.eq(n64_addr[1:27]),
-
-            # 32 bit
-            # sdram_port.cmd.addr.eq(n64_addr[2:27]),
 
             sdram_port.cmd.we.eq(0),
             sdram_port.rdata.ready.eq(1),
@@ -171,14 +153,10 @@ class N64CartBus(Module):
                 # 50 MHz = 20ns
                 #
                 # SDRAM Worst stall seems to be 10 cycles.
-                # 
+                #
                 # Read strobe length = 16.25ns * value (high nibble)
                 #
-                # 0x1240 => 15 * 20 =  300 ns - Broken
-                # 0x2040 => 26 * 20 =  520 ns - Broken
-                # 0x2840 => 32 * 20 =  650 ns - ???
-                # 0x3040 => 39 * 20 =  780 ns - Working *most of the time*
-                # 0x4040 => 52 * 20 = 1040 ns - Working stable.
+                # 0x1240 => 15 * 20 =  300 ns - works fine now
                 sdram_data.eq(Mux(n64_addr[1],
                     Cat(rom_header_csr.storage[ 0: 8], rom_header_csr.storage[ 8:16]),
                     Cat(rom_header_csr.storage[16:24], rom_header_csr.storage[24:32]),
@@ -188,12 +166,6 @@ class N64CartBus(Module):
                 sdram_data.eq(
                     Cat(sdram_port.rdata.data[ 8:16], sdram_port.rdata.data[ 0: 8]),
                 ),
-
-                # 32 bit
-                # sdram_data.eq(Mux(n64_addr[1],
-                #     Cat(sdram_port.rdata.data[24:32], sdram_port.rdata.data[16:24]),
-                #     Cat(sdram_port.rdata.data[ 8:16], sdram_port.rdata.data[ 0: 8]),
-                # )),
             ),
         ]
         self.read_active = n64_read_active = Signal()
@@ -209,13 +181,19 @@ class N64CartBus(Module):
         self.sync += custom_sel_stb.eq(0)
         self.custom_data = custom_data = Signal(16)
         self.custom_addr = custom_addr = n64_addr[1:25] # 16M 16-bit words
-        self.submodules += TestImageGenerator(custom_addr, custom_data, custom_sel_stb)
+
+        # --- Mailbox
+        mailbox_bus_r_data = Signal(32)
+        self.comb += mailbox_bus_r.adr.eq(n64_addr >> 2)
+        self.comb += mailbox_bus_w.adr.eq(n64_addr >> 2)
 
         self.sync += \
         If(sdram_sel,
             If(sdram_port.rdata.valid, n64_ad_out_r.eq(sdram_data))
         ).Elif(custom_sel,
             n64_ad_out_r.eq(custom_data),
+        ).Elif(mailbox_r_sel,
+            n64_ad_out_r.eq(Mux(n64_addr[1], mailbox_bus_r_data[0:16], mailbox_bus_r_data[16:32])),
         )
 
 
@@ -321,7 +299,8 @@ class N64CartBus(Module):
                         sdram_port.cmd.we.eq(1),
                         sdram_port.wdata.valid.eq(1),
                         sdram_port.wdata.we.eq(0b11), # enable both bytes
-                        sdram_port.wdata.data.eq(n64_ad_in_r),
+                        # Store byte swapped 16-bit half word
+                        sdram_port.wdata.data.eq(Cat(n64_ad_in_r[8:16], n64_ad_in_r[0:8])),
 
                         If(sdram_port.wdata.ready,
                             NextState("WAIT_WRITE_H"),
@@ -342,6 +321,44 @@ class N64CartBus(Module):
                     NextValue(custom_sel_stb, 1),
                     NextValue(n64_read_active, 1),
                     NextState("WAIT_READ_H"),
+                ),
+            ),
+
+            # ------------ mailbox_r_sel
+            If(mailbox_r_sel,
+                # Read access starts
+                If(~n64_read & ~n64_read_r,
+                    # Enable the read command
+                    mailbox_bus_r.cyc.eq(1),
+                    mailbox_bus_r.stb.eq(1),
+                    mailbox_bus_r.sel.eq(0b1111),
+
+                    # Go to next state when we get the ack
+                    If(mailbox_bus_r.ack,
+                        NextValue(mailbox_bus_r_data, mailbox_bus_r.dat_r),
+                        NextValue(n64_read_active, 1),
+                        NextState("WAIT_READ_H"),
+                    ),
+                ),
+            ),
+
+            # ------------ mailbox_w_sel
+            If(mailbox_w_sel,
+                # Write access starts
+                If(~n64_write & ~n64_write_r,
+                    mailbox_bus_w.cyc.eq(1),
+                    mailbox_bus_w.stb.eq(1),
+                    mailbox_bus_w.we.eq(1),
+
+                    mailbox_bus_w.sel.eq(Mux(n64_addr[1], 0b1100, 0b0011)),
+                    mailbox_bus_w.dat_w.eq(Mux(n64_addr[1],
+                        Cat(Constant(0, (16, False)), n64_ad_in_r[8:16], n64_ad_in_r[0:8]),
+                        Cat(n64_ad_in_r[8:16], n64_ad_in_r[0:8], Constant(0, (16, False))),
+                    )),
+
+                    If(mailbox_bus_w.ack,
+                        NextState("WAIT_WRITE_H"),
+                    )
                 ),
             ),
 

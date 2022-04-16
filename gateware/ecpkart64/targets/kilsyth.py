@@ -95,10 +95,60 @@ class _CRG(Module):
         sdram_clk = ClockSignal("sys2x_ps" if sdram_rate == "1:2" else "sys_ps")
         self.specials += DDROutput(1, 0, platform.request("sdram_clock"), sdram_clk)
 
+
+####
+
+class DualMasterSRAM(Module):
+    def __init__(self, mem_or_size, init=None, bus_r=None, bus_w=None):
+        self.bus_r = bus_r
+        self.bus_w = bus_w
+        bus_data_width = len(self.bus_r.dat_r)
+        self.mem = Memory(bus_data_width, mem_or_size//(bus_data_width//8), init=init)
+
+        # memory
+        port_r = self.mem.get_port(write_capable=False, we_granularity=8, mode=READ_FIRST)
+        port_w = self.mem.get_port(write_capable=True, we_granularity=8, mode=WRITE_FIRST)
+        self.specials += self.mem, port_r, port_w
+        # generate write enable signal
+        self.comb += [port_w.we[i].eq(self.bus_w.cyc & self.bus_w.stb & self.bus_w.we & self.bus_w.sel[i])
+            for i in range(bus_data_width//8)]
+        # address and data
+        self.comb += [
+            port_r.adr.eq(self.bus_r.adr[:len(port_r.adr)]),
+            self.bus_r.dat_r.eq(port_r.dat_r),
+
+            port_w.adr.eq(self.bus_w.adr[:len(port_w.adr)]),
+        ]
+        self.comb += port_w.dat_w.eq(self.bus_w.dat_w),
+        # generate ack
+        self.sync += [
+            self.bus_w.ack.eq(0),
+            If(self.bus_w.cyc & self.bus_w.stb & ~self.bus_w.ack, self.bus_w.ack.eq(1)),
+
+            self.bus_r.ack.eq(0),
+            If(self.bus_r.cyc & self.bus_r.stb & ~self.bus_r.ack, self.bus_r.ack.eq(1))
+        ]
+
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class BaseSoC(SoCCore):
     mem_map = {**SoCCore.mem_map}
+
+    def add_mailbox_dpsram(self, name, origin, size, writable=False):
+        bus_r   = wishbone.Interface(data_width=self.bus.data_width)
+        bus_w   = wishbone.Interface(data_width=self.bus.data_width)
+        ram     = DualMasterSRAM(size, bus_r=bus_r, bus_w=bus_w)
+        if writable:
+            self.bus.add_slave(name, bus_w, SoCRegion(origin=origin, size=size, cached=False, mode="w"))
+        else:
+            self.bus.add_slave(name, bus_r, SoCRegion(origin=origin, size=size, cached=False, mode="r"))
+        self.check_if_exists(name)
+        self.logger.info("DPSRAM {} {} {}.".format(
+            colorer(name),
+            colorer("added", color="green"),
+            self.bus.regions[name]))
+        setattr(self.submodules, name, ram)
+
     def __init__(self, device="LFE5U-45F", revision="1.0", toolchain="trellis",
         sys_clk_freq=int(50e6), sdram_rate="1:2",
         **kwargs):
@@ -133,7 +183,11 @@ class BaseSoC(SoCCore):
             # l2_cache_reverse = False
         )
 
-        # Add an extra dedicated wishbone bus for the n64 cart
+        # SoC <-> N64 communication
+        self.add_mailbox_dpsram("mailbox_ram_r", 0x80000000, 0x100)
+        self.add_mailbox_dpsram("mailbox_ram_w", 0x80000100, 0x100, writable=True)
+
+        # Add an extra dedicated SDRAM port for the n64 cart
         sdram_port = self.sdram.crossbar.get_port(data_width=16)
 
 
@@ -146,10 +200,12 @@ class BaseSoC(SoCCore):
         n64_pads = platform.request("n64")
 
         self.submodules.n64 = n64cart = N64Cart(
-                pads         = n64_pads,
-                sdram_port   = sdram_port,
-                sdram_wait   = self.sdram.controller.refresher.timer.wait,
-                fast_cd      = "sys",
+                pads          = n64_pads,
+                sdram_port    = sdram_port,
+                sdram_wait    = self.sdram.controller.refresher.timer.wait,
+                mailbox_bus_r = self.mailbox_ram_w.bus_r, # N64 read
+                mailbox_bus_w = self.mailbox_ram_r.bus_w, # N64 write
+                fast_cd       = "sys",
         )
         self.bus.add_slave("n64slave", self.n64.wb_slave, region=SoCRegion(origin=0x30000000, size=0x10000))
 
@@ -198,6 +254,15 @@ class BaseSoC(SoCCore):
             self.sdram.controller.refresher.fsm,
             self.sdram.controller.refresher.timer.count,
             self.sdram.controller.refresher.timer.wait,
+
+            # self.mailbox_ram_r.bus_w.adr,
+            # self.mailbox_ram_r.bus_w.dat_r,
+            # self.mailbox_ram_r.bus_w.dat_w,
+            # self.mailbox_ram_r.bus_w.cyc,
+            # self.mailbox_ram_r.bus_w.stb,
+            # self.mailbox_ram_r.bus_w.sel,
+            # self.mailbox_ram_r.bus_w.we,
+            # self.mailbox_ram_r.bus_w.ack,
         ]
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
             depth        = 1024 * 2,
