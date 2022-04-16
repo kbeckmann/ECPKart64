@@ -129,11 +129,12 @@ static int check_running(void)
 
     if (readchar_nonblock()) {
         char c = readchar();
-        INFO("Bye! (%02X)\n", c);
-
-        // Stop the CIC
-        running = 0;
-        exit_by_uart = 1;
+        if (c == 0x0a) {
+            INFO("Bye! (%02X)\n", c);
+            // Stop the CIC
+            running = 0;
+            exit_by_uart = 1;
+        }
     }
 
     if (n64_cold_reset_in_read() == 0) {
@@ -516,11 +517,21 @@ static void cic_run(void)
 
     n64cic_cic_dio_oe_write(0);
 
-    INFO("Waiting for reset... Press any key to exit.\n");
+    INFO("Waiting for reset... Press enter 3 times to exit.\n");
     // Wait for reset to be released
+    int press_count = 0;
+    char exit_char = 0x0a;
     while (n64_cold_reset_in_read() == 0) {
-        if (readchar_nonblock()) {
-            readchar();
+        if (!readchar_nonblock()) {
+            continue;
+        }
+        char c = readchar();
+        if(c != exit_char) {
+            continue;
+        }
+        press_count++;
+
+        if (press_count > 2) {
             exit_by_uart = 1;
             return;
         }

@@ -45,7 +45,7 @@ def main():
         with open(args.file, "rb") as f:
             print("Opening...")
             data_bytes = f.read()
-            port.write(bytes(f"\n\nmem_load {hex(base)} {len(data_bytes)}\n".encode("utf-8")))
+            port.write(bytes(f"\n\n\n\nmem_load {hex(base)} {len(data_bytes)}\n".encode("utf-8")))
 
             chunks = (len(data_bytes) + 1023) // 1024
             with tqdm(total=chunks, desc="Uploading", bar_format="{l_bar}{bar} [ time left: {remaining} ]") as pbar:
