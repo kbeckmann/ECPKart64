@@ -12,13 +12,14 @@ from litex import RemoteClient
 from .types import *
 from ..util.byteswap import *
 
-__all__ = ["Mailbox"]
+__all__ = ["Mailbox", "MailboxT"]
 
 IDLE = int(MailboxStateT.MAILBOX_STATUS_IDLE)
 BUSY = int(MailboxStateT.MAILBOX_STATUS_BUSY)
 DONE = int(MailboxStateT.MAILBOX_STATUS_DONE)
 
 def dbg(*args):
+    # if True:
     if False:
         print(*args)
 
@@ -53,7 +54,7 @@ class Mailbox():
 
     def tx_payload_write(self, payload):
         self._writeBytes(self.tx_payload, payload)
-        self._writeWord(self.tx_length, len(payload))
+        self._writeWord(self.tx_length, len(payload) // 4)
 
     def rx_payload_read(self):
         length = self._readWord(self.rx_length)
@@ -71,7 +72,7 @@ class Mailbox():
     def rx(self):
         dbg("[RX] 1")
         t = []
-        t.append(time.time())
+        t.append(time.monotonic())
         ii = 0
         while True:
             ii += 1
@@ -79,35 +80,36 @@ class Mailbox():
             if state == DONE:
                 break
             # dbg(f"[RX] 1: {state}")
+            # dbg(f"[RX] rx_state_recv= {self._readWord(self.rx_state_recv)}")
             # time.sleep(0.1)
         dbg("[RX] 2")
 
-        t.append(time.time())
+        t.append(time.monotonic())
 
         self._writeWord(self.tx_state_recv, BUSY)
-        t.append(time.time())
+        t.append(time.monotonic())
         dbg("[RX] 3")
 
         data = self.rx_payload_read()
-        t.append(time.time())
+        t.append(time.monotonic())
         dbg("[RX] 4")
 
         self._writeWord(self.tx_state_recv, DONE)
-        t.append(time.time())
+        t.append(time.monotonic())
         dbg("[RX] 5")
 
         while True:
             state = self._readWord(self.rx_state)
-            if state != DONE:
+            if state == IDLE:
                 break
             # dbg(state)
             # time.sleep(0.1)
-        t.append(time.time())
+        t.append(time.monotonic())
 
         dbg("[RX] 6")
 
         self._writeWord(self.tx_state_recv, IDLE)
-        t.append(time.time())
+        t.append(time.monotonic())
         dbg("[RX] 5")
 
         for i, x in enumerate(t[1:]):
@@ -119,24 +121,24 @@ class Mailbox():
         return data
 
 
-    def tx(self, data, padded=True):
+    def tx(self, data, padded=True, timeout=1):
         dbg("[TX] 1")
         t = []
-        t.append(time.time())
+        t.append(time.monotonic())
         ii = 0
         while True:
             ii += 1
             state = self._readWord(self.rx_state_recv)
-            if state != BUSY:
+            if state == IDLE:
                 break
             dbg(f"[TX] 1: {state}")
             # time.sleep(0.1)
         dbg("[TX] 2")
 
-        t.append(time.time())
+        t.append(time.monotonic())
 
         self._writeWord(self.tx_state, BUSY)
-        t.append(time.time())
+        t.append(time.monotonic())
         dbg("[TX] 3")
 
         if padded:
@@ -144,25 +146,26 @@ class Mailbox():
             if padlen > 0:
                 data += b'\x00' * (4 - padlen)
         self.tx_payload_write(data)
-        t.append(time.time())
+        t.append(time.monotonic())
         dbg("[TX] 4")
 
         self._writeWord(self.tx_state, DONE)
-        t.append(time.time())
+        t.append(time.monotonic())
         dbg("[TX] 5")
 
         while True:
             state = self._readWord(self.rx_state_recv)
             if state == DONE:
                 break
-            # dbg(state)
+            # dbg(f"[TX] rx_state= {self._readWord(self.rx_state)}")
+            # dbg(f"[TX] rx_state_recv= {state}")
             # time.sleep(0.1)
-        t.append(time.time())
+        t.append(time.monotonic())
 
         dbg("[TX] 6")
 
         self._writeWord(self.tx_state, IDLE)
-        t.append(time.time())
+        t.append(time.monotonic())
         dbg("[TX] 7")
 
         for i, x in enumerate(t[1:]):
@@ -170,5 +173,3 @@ class Mailbox():
         dbg(f"total: {t[-1] - t[0]:.5f}")
 
         dbg(ii)
-
-        return data
