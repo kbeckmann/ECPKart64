@@ -203,7 +203,7 @@ class N64CartBus(Module):
 
         # Wait for reset to be released.
         fsm.act("INIT",
-            sdram_wait.eq(1),
+            # sdram_wait.eq(1),
 
             # Reset values
             NextValue(n64_addr, 0),
@@ -215,7 +215,7 @@ class N64CartBus(Module):
 
         # Wait for /ALEL and /ALEH to both go high. This starts a bus access.
         fsm.act("START",
-            sdram_wait.eq(1),
+            # sdram_wait.eq(1),
 
             If(n64_alel & n64_aleh,
                 NextState("WAIT_ADDR_H"),
@@ -227,7 +227,7 @@ class N64CartBus(Module):
 
         # Wait for /ALEH to go low and store the high part of the address.
         fsm.act("WAIT_ADDR_H",
-            sdram_wait.eq(0),
+            # sdram_wait.eq(0),
 
             If(n64_alel & ~n64_aleh,
                 NextValue(n64_addr_h, n64_ad_in_r),
@@ -240,7 +240,7 @@ class N64CartBus(Module):
 
         # Wait for /ALEL to go low and store the low part of the address.
         fsm.act("WAIT_ADDR_L",
-            sdram_wait.eq(0),
+            # sdram_wait.eq(0),
 
             If(~n64_alel & ~n64_aleh,
                 # Store the low part
@@ -259,10 +259,10 @@ class N64CartBus(Module):
         # Wait for read or write.
         # Performs the read as well.
         fsm.act("WAIT_READ_WRITE",
-            sdram_wait.eq(0),
 
             # ------------ SDRAM
             If(sdram_sel,
+                sdram_wait.eq(0),
                 If(n64_read_active,
                     # Save one cycle latency by using rdata.valid - when this signal is high,
                     # sdram_data contains valid data. (Later on, it will not, and we need to use our register)
@@ -373,7 +373,7 @@ class N64CartBus(Module):
         )
 
         fsm.act("WAIT_READ_H",
-            sdram_wait.eq(0),
+            # sdram_wait.eq(0),
             # The data was latched in the previous state. OE = 1 now
 
             n64_ad_out.eq(n64_ad_out_r),
